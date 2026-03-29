@@ -8,9 +8,21 @@ interface Props {
   onClose: () => void;
 }
 
+const actionColor: Record<string, string> = {
+  BUY: "bg-buy/15 text-buy",
+  SELL: "bg-sell/15 text-sell",
+  NEUTRAL: "bg-muted text-muted-foreground",
+};
+
 export function SignalDetail({ signal, onClose }: Props) {
-  const isBuy = signal.action?.toUpperCase() === "BUY";
-  const isSell = signal.action?.toUpperCase() === "SELL";
+  const fields: [string, string | number | null | undefined][] = [
+    ["Timestamp", new Date(signal.timestamp).toLocaleString()],
+    ["Action", signal.action],
+    ["Confidence", signal.confidence != null ? signal.confidence : "—"],
+    ["Source", signal.source],
+    ["Event Type", signal.eventType],
+    ["Event Name", signal.eventName],
+  ];
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
@@ -18,31 +30,34 @@ export function SignalDetail({ signal, onClose }: Props) {
         <SheetHeader>
           <SheetTitle className="flex items-center gap-3 text-foreground">
             <span className="font-mono text-lg">{signal.symbol}</span>
-            <Badge
-              className={cn(
-                "font-mono border-0",
-                isBuy && "bg-buy/15 text-buy",
-                isSell && "bg-sell/15 text-sell"
-              )}
-            >
+            <Badge className={cn("font-mono border-0", actionColor[signal.action] || actionColor.NEUTRAL)}>
               {signal.action}
             </Badge>
           </SheetTitle>
         </SheetHeader>
 
         <div className="mt-6 space-y-4">
-          {[
-            ["Timestamp", new Date(signal.timestamp).toLocaleString()],
-            ["Price", typeof signal.price === "number" ? signal.price.toFixed(6) : signal.price],
-            ["Confidence", `${signal.confidence}%`],
-            ["Source", signal.source],
-          ].map(([label, value]) => (
+          {fields.map(([label, value]) => (
             <div key={label as string} className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-xs uppercase tracking-wider text-muted-foreground">{label}</span>
-              <span className="font-mono text-sm text-foreground">{value}</span>
+              <span className="font-mono text-sm text-foreground">{value ?? "—"}</span>
             </div>
           ))}
         </div>
+
+        {signal.title && (
+          <div className="mt-6">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Title</p>
+            <p className="text-sm text-foreground">{signal.title}</p>
+          </div>
+        )}
+
+        {signal.description && (
+          <div className="mt-4">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Description</p>
+            <p className="text-sm text-foreground/80 leading-relaxed">{signal.description}</p>
+          </div>
+        )}
 
         <div className="mt-6">
           <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Raw Payload</p>

@@ -1,10 +1,14 @@
 export interface Signal {
+  id: string;
   timestamp: string;
   symbol: string;
-  action: string;
-  price: number;
-  confidence: number;
+  action: "BUY" | "SELL" | "NEUTRAL";
+  confidence: number | null;
   source: string;
+  eventName: string | null;
+  eventType: string | null;
+  title: string | null;
+  description: string | null;
   payload: Record<string, unknown>;
 }
 
