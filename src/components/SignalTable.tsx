@@ -11,35 +11,34 @@ interface Props {
   signals: Signal[];
 }
 
+const actionColor: Record<string, string> = {
+  BUY: "bg-buy/15 text-buy",
+  SELL: "bg-sell/15 text-sell",
+  NEUTRAL: "bg-muted text-muted-foreground",
+};
+
 export function SignalTable({ signals }: Props) {
   const [search, setSearch] = useState("");
-  const [filterSymbol, setFilterSymbol] = useState("all");
   const [filterAction, setFilterAction] = useState("all");
   const [selected, setSelected] = useState<Signal | null>(null);
-
-  const symbols = useMemo(
-    () => [...new Set(signals.map((s) => s.symbol))].sort(),
-    [signals]
-  );
 
   const filtered = useMemo(() => {
     return signals
       .filter((s) => {
-        if (filterSymbol !== "all" && s.symbol !== filterSymbol) return false;
-        if (filterAction !== "all" && s.action?.toUpperCase() !== filterAction) return false;
+        if (filterAction !== "all" && s.action !== filterAction) return false;
         if (search) {
           const q = search.toLowerCase();
           return (
             s.symbol?.toLowerCase().includes(q) ||
-            s.action?.toLowerCase().includes(q) ||
-            s.source?.toLowerCase().includes(q) ||
-            String(s.price).includes(q)
+            s.eventName?.toLowerCase().includes(q) ||
+            s.title?.toLowerCase().includes(q) ||
+            s.source?.toLowerCase().includes(q)
           );
         }
         return true;
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [signals, search, filterSymbol, filterAction]);
+  }, [signals, search, filterAction]);
 
   return (
     <>
@@ -48,36 +47,24 @@ export function SignalTable({ signals }: Props) {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search signals…"
+            placeholder="Search by symbol, event, title…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 bg-secondary border-border font-mono text-sm"
           />
         </div>
-        <div className="flex gap-3">
-          <Select value={filterSymbol} onValueChange={setFilterSymbol}>
-            <SelectTrigger className="w-[140px] bg-secondary border-border text-sm">
-              <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="Symbol" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Symbols</SelectItem>
-              {symbols.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterAction} onValueChange={setFilterAction}>
-            <SelectTrigger className="w-[120px] bg-secondary border-border text-sm">
-              <SelectValue placeholder="Action" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="BUY">BUY</SelectItem>
-              <SelectItem value="SELL">SELL</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={filterAction} onValueChange={setFilterAction}>
+          <SelectTrigger className="w-[140px] bg-secondary border-border text-sm">
+            <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+            <SelectValue placeholder="Action" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Actions</SelectItem>
+            <SelectItem value="BUY">BUY</SelectItem>
+            <SelectItem value="SELL">SELL</SelectItem>
+            <SelectItem value="NEUTRAL">NEUTRAL</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
@@ -86,7 +73,7 @@ export function SignalTable({ signals }: Props) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-secondary/60">
-                {["Timestamp", "Symbol", "Action", "Price", "Confidence", "Source"].map((h) => (
+                {["Timestamp", "Symbol", "Action", "Confidence", "Source", "Event", "Title"].map((h) => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {h}
                   </th>
@@ -96,56 +83,40 @@ export function SignalTable({ signals }: Props) {
             <tbody className="divide-y divide-border">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
                     No signals found
                   </td>
                 </tr>
               ) : (
-                filtered.map((s, i) => {
-                  const isBuy = s.action?.toUpperCase() === "BUY";
-                  const isSell = s.action?.toUpperCase() === "SELL";
-                  return (
-                    <tr
-                      key={`${s.timestamp}-${i}`}
-                      onClick={() => setSelected(s)}
-                      className="cursor-pointer hover:bg-secondary/40 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(s.timestamp).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 font-mono font-semibold text-foreground">
-                        {s.symbol}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          className={cn(
-                            "font-mono text-xs px-2.5 py-0.5 border-0",
-                            isBuy && "bg-buy/15 text-buy",
-                            isSell && "bg-sell/15 text-sell",
-                            !isBuy && !isSell && "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {s.action}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-foreground">
-                        {typeof s.price === "number" ? s.price.toFixed(4) : s.price}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 rounded-full bg-secondary overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-primary transition-all"
-                              style={{ width: `${Math.min(s.confidence, 100)}%` }}
-                            />
-                          </div>
-                          <span className="font-mono text-xs text-muted-foreground">{s.confidence}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{s.source}</td>
-                    </tr>
-                  );
-                })
+                filtered.map((s, i) => (
+                  <tr
+                    key={s.id || `${s.timestamp}-${i}`}
+                    onClick={() => setSelected(s)}
+                    className="cursor-pointer hover:bg-secondary/40 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(s.timestamp).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 font-mono font-semibold text-foreground">
+                      {s.symbol}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={cn("font-mono text-xs px-2.5 py-0.5 border-0", actionColor[s.action] || actionColor.NEUTRAL)}>
+                        {s.action}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {s.confidence != null ? s.confidence : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{s.source}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[180px]">
+                      {s.eventName || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[220px]">
+                      {s.title || "—"}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

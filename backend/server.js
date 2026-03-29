@@ -1,9 +1,6 @@
 /**
  * Kafka Signal Monitor — Backend
  *
- * This server connects to a remote Kafka cluster and exposes
- * consumed signals via a REST API for the frontend dashboard.
- *
  * Environment variables:
  *   KAFKA_BROKERS  — comma-separated broker list (default: 65.108.235.150:9092)
  *   KAFKA_TOPIC    — topic to subscribe to (default: bridgewise.alerts.normalized)
@@ -12,6 +9,7 @@
  */
 
 const { Kafka } = require("kafkajs");
+const crypto = require("crypto");
 const http = require("http");
 const path = require("path");
 const fs = require("fs");
@@ -29,15 +27,76 @@ let kafkaConnected = false;
 let kafkaError = null;
 
 // ── Normalize ───────────────────────────────────────────────
+function mapSentiment(sentiment) {
+  if (!sentiment) return "NEUTRAL";
+  const s = sentiment.toUpperCase();
+  if (s === "POSITIVE" || s === "BULLISH") return "BUY";
+  if (s === "NEGATIVE" || s === "BEARISH") return "SELL";
+  return "NEUTRAL";
+}
+
 function normalize(raw) {
+  // Skip empty messages
+  if (!raw || typeof raw !== "object" || Object.keys(raw).length === 0) {
+    return null;
+  }
+
+  // 1. id
+  const id = raw.event_id || `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+
+  // 2. timestamp
+  const timestamp =
+    raw.processed_at ||
+    raw.raw_received_at ||
+    raw.event_date_utc ||
+    raw.timestamp ||
+    new Date().toISOString();
+
+  // 3. symbol
+  const symbol =
+    (raw.ticker && raw.ticker !== null ? raw.ticker : null) ||
+    raw.asset_name_short ||
+    raw.asset_name ||
+    raw.symbol ||
+    "UNKNOWN";
+
+  // 4. action
+  const action = raw.action
+    ? raw.action.toUpperCase() === "BUY" ? "BUY" : raw.action.toUpperCase() === "SELL" ? "SELL" : "NEUTRAL"
+    : mapSentiment(raw.sentiment);
+
+  // 5. confidence
+  const confidence = raw.importance_level != null
+    ? Number(raw.importance_level)
+    : (raw.confidence != null ? Number(raw.confidence) : null);
+
+  // 6. source
+  const source = raw.source || "bridgewise";
+
+  // 7. eventName
+  const eventName = raw.event_name || null;
+
+  // 8. eventType
+  const eventType = raw.event_type || null;
+
+  // 9. title (es > en > pt)
+  const title = raw.title_es || raw.title_en || raw.title_pt || null;
+
+  // 10. description (es > en > pt)
+  const description = raw.body_es || raw.body_en || raw.body_pt || null;
+
   return {
-    timestamp: raw.timestamp || new Date().toISOString(),
-    symbol: raw.symbol || "UNKNOWN",
-    action: (raw.action || "UNKNOWN").toUpperCase(),
-    price: typeof raw.price === "number" ? raw.price : parseFloat(raw.price) || 0,
-    confidence: typeof raw.confidence === "number" ? raw.confidence : parseInt(raw.confidence, 10) || 0,
-    source: raw.source || "unknown",
-    payload: raw.payload || raw,
+    id,
+    timestamp,
+    symbol,
+    action,
+    confidence,
+    source,
+    eventName,
+    eventType,
+    title,
+    description,
+    payload: raw,
   };
 }
 
@@ -64,11 +123,12 @@ async function startConsumer() {
         try {
           const raw = JSON.parse(message.value.toString());
           const signal = normalize(raw);
-          signals.unshift(signal);
-          if (signals.length > MAX_SIGNALS) signals = signals.slice(0, MAX_SIGNALS);
+          if (signal) {
+            signals.unshift(signal);
+            if (signals.length > MAX_SIGNALS) signals = signals.slice(0, MAX_SIGNALS);
+          }
         } catch (err) {
           console.error("⚠ Parse error:", err.message);
-          // Continue consuming — don't crash
         }
       },
     });
@@ -76,12 +136,10 @@ async function startConsumer() {
     kafkaConnected = false;
     kafkaError = err.message;
     console.error("✗ Kafka connection error:", err.message);
-    // Retry after 5 seconds
     setTimeout(startConsumer, 5000);
   }
 }
 
-// Handle disconnects
 consumer.on("consumer.disconnect", () => {
   kafkaConnected = false;
   kafkaError = "Disconnected";
@@ -100,12 +158,10 @@ function json(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
-// Serve static frontend if dist/ exists
 const DIST = path.join(__dirname, "dist");
 const hasStatic = fs.existsSync(DIST);
 
 const server = http.createServer((req, res) => {
-  // CORS preflight
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
@@ -115,7 +171,6 @@ const server = http.createServer((req, res) => {
     return res.end();
   }
 
-  // API routes
   if (req.url === "/health") {
     return json(res, 200, {
       status: kafkaConnected ? "ok" : "error",
@@ -133,7 +188,6 @@ const server = http.createServer((req, res) => {
     return json(res, 200, signals[0] || null);
   }
 
-  // Static file serving (production)
   if (hasStatic) {
     let filePath = path.join(DIST, req.url === "/" ? "index.html" : req.url);
     if (!fs.existsSync(filePath)) filePath = path.join(DIST, "index.html");
@@ -154,13 +208,11 @@ const server = http.createServer((req, res) => {
   json(res, 404, { error: "Not found" });
 });
 
-// ── Start ───────────────────────────────────────────────────
 server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   startConsumer();
 });
 
-// Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("Shutting down…");
   await consumer.disconnect();
