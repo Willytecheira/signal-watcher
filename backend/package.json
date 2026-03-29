@@ -1,0 +1,12 @@
+{
+  "name": "kafka-signal-monitor-backend",
+  "version": "1.0.0",
+  "description": "Backend for Kafka Signal Monitor — connects to remote Kafka and serves signals via REST API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4"
+  }
+}
