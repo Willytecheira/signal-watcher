@@ -5,16 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { SignalDetail } from "@/components/SignalDetail";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, Inbox } from "lucide-react";
 
 interface Props {
   signals: Signal[];
 }
 
 const actionColor: Record<string, string> = {
-  BUY: "bg-buy/15 text-buy",
-  SELL: "bg-sell/15 text-sell",
-  NEUTRAL: "bg-muted text-muted-foreground",
+  BUY: "bg-buy/15 text-buy border border-buy/20",
+  SELL: "bg-sell/15 text-sell border border-sell/20",
+  NEUTRAL: "bg-muted text-muted-foreground border border-border",
 };
 
 export function SignalTable({ signals }: Props) {
@@ -50,11 +50,11 @@ export function SignalTable({ signals }: Props) {
             placeholder="Search by symbol, event, title…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-secondary border-border font-mono text-sm"
+            className="pl-9 bg-card/60 backdrop-blur-sm border-border/60 font-mono text-sm focus:border-primary/40 focus:ring-primary/20 transition-all"
           />
         </div>
         <Select value={filterAction} onValueChange={setFilterAction}>
-          <SelectTrigger className="w-[140px] bg-secondary border-border text-sm">
+          <SelectTrigger className="w-[160px] bg-card/60 backdrop-blur-sm border-border/60 text-sm">
             <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
             <SelectValue placeholder="Action" />
           </SelectTrigger>
@@ -68,23 +68,29 @@ export function SignalTable({ signals }: Props) {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-xl border border-border/50 overflow-hidden glass">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-secondary/60">
+              <tr className="bg-secondary/40 border-b border-border/50">
                 {["Timestamp", "Symbol", "Action", "Confidence", "Source", "Event", "Title"].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th key={h} className="px-4 py-3.5 text-left text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/30">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
-                    No signals found
+                  <td colSpan={7} className="text-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="rounded-full bg-secondary p-4">
+                        <Inbox className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground text-sm">No signals found</p>
+                      <p className="text-muted-foreground/60 text-xs">Waiting for Kafka messages…</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -92,27 +98,27 @@ export function SignalTable({ signals }: Props) {
                   <tr
                     key={s.id || `${s.timestamp}-${i}`}
                     onClick={() => setSelected(s)}
-                    className="cursor-pointer hover:bg-secondary/40 transition-colors"
+                    className="cursor-pointer hover:bg-primary/[0.03] transition-all duration-200 group animate-shimmer"
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                    <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(s.timestamp).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 font-mono font-semibold text-foreground">
+                    <td className="px-4 py-3.5 font-mono font-bold text-foreground group-hover:text-primary transition-colors">
                       {s.symbol}
                     </td>
-                    <td className="px-4 py-3">
-                      <Badge className={cn("font-mono text-xs px-2.5 py-0.5 border-0", actionColor[s.action] || actionColor.NEUTRAL)}>
+                    <td className="px-4 py-3.5">
+                      <Badge className={cn("font-mono text-[10px] font-semibold px-2.5 py-0.5", actionColor[s.action] || actionColor.NEUTRAL)}>
                         {s.action}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                    <td className="px-4 py-3.5 font-mono text-xs text-muted-foreground">
                       {s.confidence != null ? s.confidence : "—"}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{s.source}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[180px]">
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground">{s.source}</td>
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground truncate max-w-[180px]">
                       {s.eventName || "—"}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[220px]">
+                    <td className="px-4 py-3.5 text-xs text-muted-foreground truncate max-w-[220px]">
                       {s.title || "—"}
                     </td>
                   </tr>
