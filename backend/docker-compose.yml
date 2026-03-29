@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  signal-monitor:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      # ── Change these to point to your Kafka cluster ──
+      KAFKA_BROKERS: "65.108.235.150:9092"
+      KAFKA_TOPIC: "bridgewise.alerts.normalized"
+      KAFKA_GROUP_ID: "lovable-signals-app"
+      PORT: "3000"
+    restart: unless-stopped
