@@ -60,6 +60,13 @@ const Index = () => {
         <section className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           <SignalTable signals={signals} />
         </section>
+
+        {/* Footer */}
+        <footer className="mt-12 py-6 border-t border-border/30 text-center">
+          <p className="text-xs text-muted-foreground font-mono">
+            © {new Date().getFullYear()} Bridgewise Signal Monitor. All rights reserved.
+          </p>
+        </footer>
       </div>
     </div>
   );
