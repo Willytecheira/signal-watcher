@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Signal, ConnectionStatus } from "@/types/signal";
 
-const API_URL = import.meta.env.VITE_API_URL || "";
+const API_URL = import.meta.env.VITE_API_URL || "http://65.108.235.150:3000";
 
 export function useSignals(interval = 5000) {
   const [signals, setSignals] = useState<Signal[]>([]);
