@@ -24,7 +24,7 @@ const Index = () => {
               <Radio className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground tracking-tight">
+              <h1 className="text-2xl font-bold text-foreground tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 Signal Monitor
               </h1>
               <p className="text-xs text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
