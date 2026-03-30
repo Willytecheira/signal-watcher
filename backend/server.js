@@ -21,7 +21,7 @@ const GROUP_ID = process.env.KAFKA_GROUP_ID || "lovable-signals-app";
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 // ── State ───────────────────────────────────────────────────
-const MAX_SIGNALS = 100;
+const MAX_SIGNALS = 1000;
 let signals = [];
 let kafkaConnected = false;
 let kafkaError = null;
