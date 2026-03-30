@@ -30,67 +30,57 @@ function mapSentiment(sentiment) {
 }
 
 function normalize(raw) {
-  // Skip empty messages
   if (!raw || typeof raw !== "object" || Object.keys(raw).length === 0) {
     return null;
   }
 
+  const meta = raw.eventMetadata || {};
+  const assets = raw.assetsDetails || {};
+  const content = raw.eventContent || {};
+
+  // Pick best locale: es > en > any
+  const loc = content["es-ES"] || content["en-US"] || content[Object.keys(content)[0]] || {};
+
   // 1. id
-  const id = raw.event_id || `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+  const id = meta.uniqueEventId || raw.event_id || `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
 
   // 2. timestamp
-  const timestamp =
-    raw.processed_at ||
-    raw.raw_received_at ||
-    raw.event_date_utc ||
-    raw.timestamp ||
-    new Date().toISOString();
+  const timestamp = meta.eventDate || raw.processed_at || raw.timestamp || new Date().toISOString();
 
-  // 3. symbol
+  // 3. symbol — from assetsDetails first, then flat fields
   const symbol =
-    (raw.ticker && raw.ticker !== null ? raw.ticker : null) ||
+    assets.tickerSymbol ||
+    assets.assetNameShort ||
+    assets.assetName ||
+    raw.ticker ||
     raw.asset_name_short ||
-    raw.asset_name ||
     raw.symbol ||
     "UNKNOWN";
 
   // 4. action
   const action = raw.action
-    ? raw.action.toUpperCase() === "BUY" ? "BUY" : raw.action.toUpperCase() === "SELL" ? "SELL" : "NEUTRAL"
-    : mapSentiment(raw.sentiment);
+    ? (raw.action.toUpperCase() === "BUY" ? "BUY" : raw.action.toUpperCase() === "SELL" ? "SELL" : "NEUTRAL")
+    : mapSentiment(meta.eventSentiment || raw.sentiment);
 
   // 5. confidence
-  const confidence = raw.importance_level != null
-    ? Number(raw.importance_level)
-    : (raw.confidence != null ? Number(raw.confidence) : null);
+  const confidence = meta.eventImportanceLevel != null
+    ? Number(meta.eventImportanceLevel)
+    : (raw.importance_level != null ? Number(raw.importance_level) : null);
 
   // 6. source
   const source = raw.source || "bridgewise";
 
-  // 7. eventName
-  const eventName = raw.event_name || null;
+  // 7. eventName & eventType
+  const eventName = meta.eventName || raw.event_name || null;
+  const eventType = meta.eventType || raw.event_type || null;
 
-  // 8. eventType
-  const eventType = raw.event_type || null;
-
-  // 9. title (es > en > pt)
-  const title = raw.title_es || raw.title_en || raw.title_pt || null;
-
-  // 10. description (es > en > pt)
-  const description = raw.body_es || raw.body_en || raw.body_pt || null;
+  // 8. title & description from localized content
+  const title = loc.eventTitle || raw.title_es || raw.title_en || null;
+  const description = loc.eventBody || raw.body_es || raw.body_en || null;
 
   return {
-    id,
-    timestamp,
-    symbol,
-    action,
-    confidence,
-    source,
-    eventName,
-    eventType,
-    title,
-    description,
-    payload: raw,
+    id, timestamp, symbol, action, confidence, source,
+    eventName, eventType, title, description, payload: raw,
   };
 }
 
@@ -115,7 +105,15 @@ async function startConsumer() {
     await consumer.run({
       eachMessage: async ({ message }) => {
         try {
-          const raw = JSON.parse(message.value.toString());
+          // Strip first 5 bytes (schema registry header)
+          let buf = message.value;
+          let str = buf.toString();
+          // Find first '{' to skip binary/garbage prefix
+          const jsonStart = str.indexOf("{");
+          if (jsonStart === -1) return;
+          if (jsonStart > 0) str = str.slice(jsonStart);
+
+          const raw = JSON.parse(str);
           const signal = normalize(raw);
           if (signal) {
             insertSignal(signal);
