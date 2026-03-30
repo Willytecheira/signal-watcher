@@ -44,6 +44,15 @@ const deleteWebhook = db.prepare(`DELETE FROM webhooks WHERE id = ?`);
 const listWebhooks = db.prepare(`SELECT * FROM webhooks ORDER BY created_at DESC`);
 const activeWebhooks = db.prepare(`SELECT * FROM webhooks WHERE active = 1`);
 
+const insertLog = db.prepare(
+  `INSERT INTO webhook_logs (webhook_id, webhook_name, signal_id, signal_symbol, status, http_status, error_message)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`
+);
+const selectLogs = db.prepare(
+  `SELECT * FROM webhook_logs ORDER BY created_at DESC LIMIT ? OFFSET ?`
+);
+const countLogs = db.prepare(`SELECT COUNT(*) as count FROM webhook_logs`);
+
 function createWebhook({ name, url, secret, filter_symbol, filter_action, filter_event_type }) {
   const id = crypto.randomUUID();
   insertWebhook.run(id, name, url, secret || null, filter_symbol || null, filter_action || null, filter_event_type || null, 1);
@@ -60,6 +69,14 @@ function removeWebhook(id) {
 
 function getAllWebhooks() {
   return listWebhooks.all().map(w => ({ ...w, active: !!w.active }));
+}
+
+function getWebhookLogs(limit = 50, offset = 0) {
+  return selectLogs.all(limit, offset);
+}
+
+function getWebhookLogCount() {
+  return countLogs.get().count;
 }
 
 // ── Dispatch signal to matching webhooks ────────────────────
@@ -81,8 +98,15 @@ async function dispatchSignal(signal) {
         const sig = crypto.createHmac("sha256", hook.secret).update(body).digest("hex");
         headers["X-Webhook-Signature"] = sig;
       }
-      fetch(hook.url, { method: "POST", headers, body }).catch(() => {});
-    } catch {}
+      try {
+        const resp = await fetch(hook.url, { method: "POST", headers, body });
+        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, resp.ok ? "success" : "error", resp.status, resp.ok ? null : `HTTP ${resp.status}`);
+      } catch (fetchErr) {
+        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, fetchErr.message);
+      }
+    } catch (err) {
+      insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, err.message);
+    }
   }
 }
 
