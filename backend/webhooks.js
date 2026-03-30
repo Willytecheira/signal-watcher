@@ -50,8 +50,8 @@ const listWebhooks = db.prepare(`SELECT * FROM webhooks ORDER BY created_at DESC
 const activeWebhooks = db.prepare(`SELECT * FROM webhooks WHERE active = 1`);
 
 const insertLog = db.prepare(
-  `INSERT INTO webhook_logs (webhook_id, webhook_name, signal_id, signal_symbol, status, http_status, error_message)
-   VALUES (?, ?, ?, ?, ?, ?, ?)`
+  `INSERT INTO webhook_logs (webhook_id, webhook_name, signal_id, signal_symbol, status, http_status, error_message, response_body)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 );
 const selectLogs = db.prepare(
   `SELECT * FROM webhook_logs ORDER BY created_at DESC LIMIT ? OFFSET ?`
