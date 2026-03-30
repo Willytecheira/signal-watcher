@@ -13,7 +13,7 @@ const { insertSignal, getSignals, getCount } = require("./db");
 // ── Config ──────────────────────────────────────────────────
 const BROKERS = (process.env.KAFKA_BROKERS || "65.108.235.150:9092").split(",");
 const TOPIC = process.env.KAFKA_TOPIC || "bridgewise.alerts.normalized";
-const GROUP_ID = process.env.KAFKA_GROUP_ID || "lovable-signals-app";
+const GROUP_ID = process.env.KAFKA_GROUP_ID || "lovable-signals-reprocess-v1";
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 // ── State ───────────────────────────────────────────────────
@@ -100,7 +100,7 @@ async function startConsumer() {
     kafkaError = null;
     console.log(`✓ Connected to Kafka: ${BROKERS.join(", ")}`);
 
-    await consumer.subscribe({ topic: TOPIC, fromBeginning: false });
+    await consumer.subscribe({ topic: TOPIC, fromBeginning: true });
 
     await consumer.run({
       eachMessage: async ({ message }) => {
