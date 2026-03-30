@@ -10,7 +10,8 @@ const http = require("http");
 const path = require("path");
 const fs = require("fs");
 const { insertSignal, getSignals, getCount } = require("./db");
-const { handleAuthRoutes, requireAuth } = require("./auth");
+const { handleAuthRoutes, requireAuth, requireAdmin } = require("./auth");
+const { handleWebhookRoutes, dispatchSignal } = require("./webhooks");
 // ── Config ──────────────────────────────────────────────────
 const BROKERS = (process.env.KAFKA_BROKERS || "65.108.235.150:9092").split(",");
 const TOPIC = process.env.KAFKA_TOPIC || "bridgewise.alerts.normalized";
@@ -118,6 +119,7 @@ async function startConsumer() {
           const signal = normalize(raw);
           if (signal) {
             insertSignal(signal);
+            dispatchSignal(signal);
           }
         } catch (err) {
           console.error("⚠ Parse error:", err.message);
@@ -144,8 +146,8 @@ function json(res, status, data) {
   res.writeHead(status, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   });
   res.end(JSON.stringify(data));
 }
@@ -157,8 +159,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
     });
     return res.end();
   }
@@ -173,8 +175,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Auth routes
-  const handled = await handleAuthRoutes(req, res, json);
-  if (handled !== false) return;
+  const authHandled = await handleAuthRoutes(req, res, json);
+  if (authHandled !== false) return;
+
+  // Webhook routes
+  const whHandled = await handleWebhookRoutes(req, res, json, requireAdmin);
+  if (whHandled !== false) return;
 
   // Protected API routes
   if (req.url === "/api/signals") {
