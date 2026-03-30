@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Webhook, Plus, Trash2, X, Pencil, Check, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { WebhookLogs } from "./WebhookLogs";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://consumer.clickwa.tech";
 
