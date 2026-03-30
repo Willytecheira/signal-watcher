@@ -1,23 +1,26 @@
+import { useState } from "react";
 import { useSignals } from "@/hooks/useSignals";
+import { useAuth } from "@/hooks/useAuth";
 import { StatusIndicator } from "@/components/StatusIndicator";
 import { MetricCards } from "@/components/MetricCards";
 import { SignalTable } from "@/components/SignalTable";
-import { Radio, RefreshCw } from "lucide-react";
+import { AdminPanel } from "@/components/AdminPanel";
+import { Radio, RefreshCw, LogOut, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const { signals, status, lastUpdated, refetch } = useSignals(5000);
+  const { user, logout } = useAuth();
+  const [adminOpen, setAdminOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Ambient background effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/[0.03] blur-3xl" />
         <div className="absolute top-1/3 -left-20 w-72 h-72 rounded-full bg-accent/[0.03] blur-3xl" />
       </div>
 
       <div className="relative z-10 p-4 md:p-8 max-w-[1600px] mx-auto">
-        {/* Header */}
         <header className="animate-fade-in-up flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 rounded-xl border border-border/50 p-5" style={{ background: 'var(--gradient-header)' }}>
           <div className="flex items-center gap-4">
             <div className="rounded-xl bg-primary/10 p-3 animate-pulse-glow">
@@ -33,41 +36,46 @@ const Index = () => {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <StatusIndicator status={status} />
             {lastUpdated && (
               <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
                 {lastUpdated.toLocaleTimeString()}
               </span>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={refetch}
-              className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
-            >
+            <Button variant="ghost" size="icon" onClick={refetch} className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors">
               <RefreshCw className="h-4 w-4" />
             </Button>
+            {user?.role === "admin" && (
+              <Button variant="ghost" size="icon" onClick={() => setAdminOpen(true)} className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors">
+                <Users className="h-4 w-4" />
+              </Button>
+            )}
+            <div className="flex items-center gap-2 border-l border-border/30 pl-3">
+              <span className="text-xs text-muted-foreground font-mono">{user?.username}</span>
+              <Button variant="ghost" size="icon" onClick={logout} className="h-8 w-8 text-muted-foreground hover:text-destructive transition-colors">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </header>
 
-        {/* Metrics */}
         <section className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
           <MetricCards signals={signals} />
         </section>
 
-        {/* Table */}
         <section className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           <SignalTable signals={signals} />
         </section>
 
-        {/* Footer */}
         <footer className="mt-12 py-6 border-t border-border/30 text-center">
           <p className="text-xs text-muted-foreground font-mono">
             © {new Date().getFullYear()} Bridgewise Signal Monitor. All rights reserved.
           </p>
         </footer>
       </div>
+
+      <AdminPanel open={adminOpen} onClose={() => setAdminOpen(false)} />
     </div>
   );
 };
