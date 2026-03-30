@@ -27,9 +27,14 @@ db.exec(`
     status TEXT NOT NULL,
     http_status INTEGER,
     error_message TEXT,
+    response_body TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   )
 `);
+
+// Add response_body column if missing (migration for existing DBs)
+try { db.exec(`ALTER TABLE webhook_logs ADD COLUMN response_body TEXT`); } catch {}
+
 
 db.exec(`CREATE INDEX IF NOT EXISTS idx_webhook_logs_created ON webhook_logs(created_at DESC)`);
 
@@ -45,8 +50,8 @@ const listWebhooks = db.prepare(`SELECT * FROM webhooks ORDER BY created_at DESC
 const activeWebhooks = db.prepare(`SELECT * FROM webhooks WHERE active = 1`);
 
 const insertLog = db.prepare(
-  `INSERT INTO webhook_logs (webhook_id, webhook_name, signal_id, signal_symbol, status, http_status, error_message)
-   VALUES (?, ?, ?, ?, ?, ?, ?)`
+  `INSERT INTO webhook_logs (webhook_id, webhook_name, signal_id, signal_symbol, status, http_status, error_message, response_body)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 );
 const selectLogs = db.prepare(
   `SELECT * FROM webhook_logs ORDER BY created_at DESC LIMIT ? OFFSET ?`
@@ -100,12 +105,15 @@ async function dispatchSignal(signal) {
       }
       try {
         const resp = await fetch(hook.url, { method: "POST", headers, body });
-        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, resp.ok ? "success" : "error", resp.status, resp.ok ? null : `HTTP ${resp.status}`);
+        let respBody = null;
+        try { respBody = await resp.text(); } catch {}
+        const truncated = respBody && respBody.length > 500 ? respBody.slice(0, 500) + "…" : respBody;
+        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, resp.ok ? "success" : "error", resp.status, resp.ok ? null : `HTTP ${resp.status}`, truncated);
       } catch (fetchErr) {
-        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, fetchErr.message);
+        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, fetchErr.message, null);
       }
     } catch (err) {
-      insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, err.message);
+      insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, err.message, null);
     }
   }
 }
