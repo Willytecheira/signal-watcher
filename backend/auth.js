@@ -157,4 +157,4 @@ async function handleAuthRoutes(req, res, json) {
   return false; // not handled
 }
 
-module.exports = { handleAuthRoutes, requireAuth, getAuthUser };
+module.exports = { handleAuthRoutes, requireAuth, requireAdmin, getAuthUser };
