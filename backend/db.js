@@ -41,15 +41,12 @@ function insertSignal(signal) {
   });
 }
 
-const selectAllStmt = db.prepare(
-  `SELECT * FROM signals ORDER BY timestamp DESC LIMIT ?`
-);
-const selectUnlimitedStmt = db.prepare(
-  `SELECT * FROM signals ORDER BY timestamp DESC`
+const selectPageStmt = db.prepare(
+  `SELECT * FROM signals ORDER BY timestamp DESC LIMIT ? OFFSET ?`
 );
 
-function getSignals(limit = -1) {
-  const rows = limit > 0 ? selectAllStmt.all(limit) : selectUnlimitedStmt.all();
+function getSignals(limit = 50, offset = 0) {
+  const rows = selectPageStmt.all(limit, offset);
   return rows.map((row) => ({
     ...row,
     eventName: row.event_name,

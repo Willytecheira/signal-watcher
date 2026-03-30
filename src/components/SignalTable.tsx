@@ -5,10 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { SignalDetail } from "@/components/SignalDetail";
-import { Search, Filter, Inbox } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Filter, Inbox, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Props {
   signals: Signal[];
+  page: number;
+  totalPages: number;
+  total: number;
+  onPageChange: (page: number) => void;
 }
 
 const actionColor: Record<string, string> = {

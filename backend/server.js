@@ -183,9 +183,15 @@ const server = http.createServer(async (req, res) => {
   if (whHandled !== false) return;
 
   // Protected API routes
-  if (req.url === "/api/signals") {
+  if (req.url.startsWith("/api/signals") && !req.url.startsWith("/api/signals/")) {
     if (!requireAuth(req)) return json(res, 401, { error: "Unauthorized" });
-    return json(res, 200, getSignals(-1));
+    const url = new URL(req.url, `http://localhost`);
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)));
+    const offset = (page - 1) * limit;
+    const data = getSignals(limit, offset);
+    const total = getCount();
+    return json(res, 200, { data, total, page, limit, totalPages: Math.ceil(total / limit) });
   }
 
   if (req.url === "/api/signals/latest") {
