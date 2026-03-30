@@ -113,7 +113,7 @@ async function dispatchSignal(signal) {
         insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, fetchErr.message, null);
       }
     } catch (err) {
-      insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, err.message);
+      insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, err.message, null);
     }
   }
 }
