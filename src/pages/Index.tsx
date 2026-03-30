@@ -10,7 +10,7 @@ import { Radio, RefreshCw, LogOut, Users, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Index = () => {
-  const { signals, status, lastUpdated, refetch } = useSignals(5000);
+  const { signals, status, lastUpdated, refetch, page, totalPages, total, goToPage } = useSignals(5000);
   const { user, logout } = useAuth();
   const [adminOpen, setAdminOpen] = useState(false);
   const [webhooksOpen, setWebhooksOpen] = useState(false);
@@ -45,7 +45,7 @@ const Index = () => {
                 {lastUpdated.toLocaleTimeString()}
               </span>
             )}
-            <Button variant="ghost" size="icon" onClick={refetch} className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors">
+            <Button variant="ghost" size="icon" onClick={() => refetch()} className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors">
               <RefreshCw className="h-4 w-4" />
             </Button>
             {user?.role === "admin" && (
@@ -72,7 +72,7 @@ const Index = () => {
         </section>
 
         <section className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          <SignalTable signals={signals} />
+          <SignalTable signals={signals} page={page} totalPages={totalPages} total={total} onPageChange={goToPage} />
         </section>
 
         <footer className="mt-12 py-6 border-t border-border/30 text-center">
