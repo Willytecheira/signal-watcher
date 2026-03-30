@@ -27,9 +27,14 @@ db.exec(`
     status TEXT NOT NULL,
     http_status INTEGER,
     error_message TEXT,
+    response_body TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   )
 `);
+
+// Add response_body column if missing (migration for existing DBs)
+try { db.exec(`ALTER TABLE webhook_logs ADD COLUMN response_body TEXT`); } catch {}
+
 
 db.exec(`CREATE INDEX IF NOT EXISTS idx_webhook_logs_created ON webhook_logs(created_at DESC)`);
 
