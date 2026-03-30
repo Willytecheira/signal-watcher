@@ -30,9 +30,11 @@ if (!adminExists) {
 
 // ── DB helpers ──────────────────────────────────────────────
 const findByUsername = db.prepare("SELECT * FROM users WHERE username = ?");
+const findById = db.prepare("SELECT * FROM users WHERE id = ?");
 const listUsers = db.prepare("SELECT id, username, role, created_at FROM users ORDER BY created_at");
 const deleteById = db.prepare("DELETE FROM users WHERE id = ? AND username != 'admin'");
 const insertUser = db.prepare("INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)");
+const updateUserStmt = db.prepare("UPDATE users SET username=?, password_hash=?, role=? WHERE id=?");
 
 function createUser(username, password, role = "user") {
   const existing = findByUsername.get(username);
@@ -41,6 +43,21 @@ function createUser(username, password, role = "user") {
   const hash = bcrypt.hashSync(password, 10);
   insertUser.run(id, username, hash, role);
   return { id, username, role };
+}
+
+function updateUser(id, { username, password, role }) {
+  const user = findById.get(id);
+  if (!user) return { error: "User not found" };
+  const newUsername = username || user.username;
+  const newHash = password ? bcrypt.hashSync(password, 10) : user.password_hash;
+  const newRole = role || user.role;
+  // Check username uniqueness if changed
+  if (newUsername !== user.username) {
+    const dup = findByUsername.get(newUsername);
+    if (dup) return { error: "Username already exists" };
+  }
+  updateUserStmt.run(newUsername, newHash, newRole, id);
+  return { id, username: newUsername, role: newRole };
 }
 
 // ── JWT helpers ─────────────────────────────────────────────
@@ -116,6 +133,17 @@ async function handleAuthRoutes(req, res, json) {
     const result = createUser(body.username, body.password, body.role || "user");
     if (result.error) return json(res, 409, result);
     return json(res, 201, result);
+  }
+
+  // PUT /api/admin/users/:id
+  if (url.startsWith("/api/admin/users/") && method === "PUT") {
+    if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
+    const id = url.split("/api/admin/users/")[1];
+    const body = await readBody(req);
+    if (!body) return json(res, 400, { error: "Invalid body" });
+    const result = updateUser(id, body);
+    if (result.error) return json(res, 409, result);
+    return json(res, 200, result);
   }
 
   // DELETE /api/admin/users/:id
