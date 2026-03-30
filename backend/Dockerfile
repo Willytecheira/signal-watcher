@@ -11,7 +11,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy backend
-COPY backend/package.json backend/server.js backend/db.js backend/auth.js ./
+COPY backend/package.json backend/server.js backend/db.js backend/auth.js backend/webhooks.js ./
 RUN npm install --production
 
 # Copy built frontend into dist/

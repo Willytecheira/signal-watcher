@@ -5,13 +5,15 @@ import { StatusIndicator } from "@/components/StatusIndicator";
 import { MetricCards } from "@/components/MetricCards";
 import { SignalTable } from "@/components/SignalTable";
 import { AdminPanel } from "@/components/AdminPanel";
-import { Radio, RefreshCw, LogOut, Users } from "lucide-react";
+import { WebhookPanel } from "@/components/WebhookPanel";
+import { Radio, RefreshCw, LogOut, Users, Webhook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const { signals, status, lastUpdated, refetch } = useSignals(5000);
   const { user, logout } = useAuth();
   const [adminOpen, setAdminOpen] = useState(false);
+  const [webhooksOpen, setWebhooksOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -47,9 +49,14 @@ const Index = () => {
               <RefreshCw className="h-4 w-4" />
             </Button>
             {user?.role === "admin" && (
-              <Button variant="ghost" size="icon" onClick={() => setAdminOpen(true)} className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors">
-                <Users className="h-4 w-4" />
-              </Button>
+              <>
+                <Button variant="ghost" size="icon" onClick={() => setAdminOpen(true)} className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors">
+                  <Users className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setWebhooksOpen(true)} className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors">
+                  <Webhook className="h-4 w-4" />
+                </Button>
+              </>
             )}
             <div className="flex items-center gap-2 border-l border-border/30 pl-3">
               <span className="text-xs text-muted-foreground font-mono">{user?.username}</span>
@@ -76,6 +83,7 @@ const Index = () => {
       </div>
 
       <AdminPanel open={adminOpen} onClose={() => setAdminOpen(false)} />
+      <WebhookPanel open={webhooksOpen} onClose={() => setWebhooksOpen(false)} />
     </div>
   );
 };
