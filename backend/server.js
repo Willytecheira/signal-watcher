@@ -1,8 +1,15 @@
 /**
  * Kafka Signal Monitor — Backend
  *
- * Environment variables:
- *   KAFKA_BROKERS  — comma-separated broker list (default: 65.108.235.150:9092)
+ * Signals are persisted in SQLite (signals.db).
+ */
+
+const { Kafka } = require("kafkajs");
+const crypto = require("crypto");
+const http = require("http");
+const path = require("path");
+const fs = require("fs");
+const { insertSignal, getSignals, getCount } = require("./db");
  *   KAFKA_TOPIC    — topic to subscribe to (default: bridgewise.alerts.normalized)
  *   KAFKA_GROUP_ID — consumer group id (default: lovable-signals-app)
  *   PORT           — HTTP port (default: 3000)
@@ -21,8 +28,6 @@ const GROUP_ID = process.env.KAFKA_GROUP_ID || "lovable-signals-app";
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 // ── State ───────────────────────────────────────────────────
-const MAX_SIGNALS = 1000;
-let signals = [];
 let kafkaConnected = false;
 let kafkaError = null;
 
@@ -124,8 +129,7 @@ async function startConsumer() {
           const raw = JSON.parse(message.value.toString());
           const signal = normalize(raw);
           if (signal) {
-            signals.unshift(signal);
-            if (signals.length > MAX_SIGNALS) signals = signals.slice(0, MAX_SIGNALS);
+            insertSignal(signal);
           }
         } catch (err) {
           console.error("⚠ Parse error:", err.message);
@@ -175,17 +179,18 @@ const server = http.createServer((req, res) => {
     return json(res, 200, {
       status: kafkaConnected ? "ok" : "error",
       kafka: kafkaConnected ? "connected" : kafkaError || "disconnected",
-      signals: signals.length,
+      signals: getCount(),
       uptime: process.uptime(),
     });
   }
 
   if (req.url === "/api/signals") {
-    return json(res, 200, signals);
+    return json(res, 200, getSignals(1000));
   }
 
   if (req.url === "/api/signals/latest") {
-    return json(res, 200, signals[0] || null);
+    const all = getSignals(1);
+    return json(res, 200, all[0] || null);
   }
 
   if (hasStatic) {
