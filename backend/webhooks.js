@@ -16,6 +16,23 @@ db.exec(`
   )
 `);
 
+// ── Webhook logs table ─────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS webhook_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    webhook_id TEXT NOT NULL,
+    webhook_name TEXT,
+    signal_id TEXT,
+    signal_symbol TEXT,
+    status TEXT NOT NULL,
+    http_status INTEGER,
+    error_message TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
+db.exec(`CREATE INDEX IF NOT EXISTS idx_webhook_logs_created ON webhook_logs(created_at DESC)`);
+
 const insertWebhook = db.prepare(
   `INSERT INTO webhooks (id, name, url, secret, filter_symbol, filter_action, filter_event_type, active)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
