@@ -153,7 +153,7 @@ function json(res, status, data) {
 const DIST = path.join(__dirname, "dist");
 const hasStatic = fs.existsSync(DIST);
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
