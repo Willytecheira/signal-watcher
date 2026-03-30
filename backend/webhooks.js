@@ -127,6 +127,17 @@ async function handleWebhookRoutes(req, res, json, requireAdmin) {
 
   if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
 
+  // GET /api/admin/webhooks/logs
+  if (url.startsWith("/api/admin/webhooks/logs") && method === "GET") {
+    const params = new URL(url, "http://localhost").searchParams;
+    const page = Math.max(1, parseInt(params.get("page") || "1", 10));
+    const limit = Math.min(200, Math.max(1, parseInt(params.get("limit") || "50", 10)));
+    const offset = (page - 1) * limit;
+    const data = getWebhookLogs(limit, offset);
+    const total = getWebhookLogCount();
+    return json(res, 200, { data, total, page, limit, totalPages: Math.ceil(total / limit) });
+  }
+
   // GET /api/admin/webhooks
   if (url === "/api/admin/webhooks" && method === "GET") {
     return json(res, 200, getAllWebhooks());
