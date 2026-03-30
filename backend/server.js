@@ -172,7 +172,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url === "/api/signals") {
-    return json(res, 200, getSignals(1000));
+    return json(res, 200, getSignals(-1));
   }
 
   if (req.url === "/api/signals/latest") {

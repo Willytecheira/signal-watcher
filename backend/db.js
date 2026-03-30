@@ -44,9 +44,13 @@ function insertSignal(signal) {
 const selectAllStmt = db.prepare(
   `SELECT * FROM signals ORDER BY timestamp DESC LIMIT ?`
 );
+const selectUnlimitedStmt = db.prepare(
+  `SELECT * FROM signals ORDER BY timestamp DESC`
+);
 
-function getSignals(limit = 1000) {
-  return selectAllStmt.all(limit).map((row) => ({
+function getSignals(limit = -1) {
+  const rows = limit > 0 ? selectAllStmt.all(limit) : selectUnlimitedStmt.all();
+  return rows.map((row) => ({
     ...row,
     eventName: row.event_name,
     eventType: row.event_type,
