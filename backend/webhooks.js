@@ -16,6 +16,23 @@ db.exec(`
   )
 `);
 
+// ── Webhook logs table ─────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS webhook_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    webhook_id TEXT NOT NULL,
+    webhook_name TEXT,
+    signal_id TEXT,
+    signal_symbol TEXT,
+    status TEXT NOT NULL,
+    http_status INTEGER,
+    error_message TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
+db.exec(`CREATE INDEX IF NOT EXISTS idx_webhook_logs_created ON webhook_logs(created_at DESC)`);
+
 const insertWebhook = db.prepare(
   `INSERT INTO webhooks (id, name, url, secret, filter_symbol, filter_action, filter_event_type, active)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
@@ -26,6 +43,15 @@ const updateWebhook = db.prepare(
 const deleteWebhook = db.prepare(`DELETE FROM webhooks WHERE id = ?`);
 const listWebhooks = db.prepare(`SELECT * FROM webhooks ORDER BY created_at DESC`);
 const activeWebhooks = db.prepare(`SELECT * FROM webhooks WHERE active = 1`);
+
+const insertLog = db.prepare(
+  `INSERT INTO webhook_logs (webhook_id, webhook_name, signal_id, signal_symbol, status, http_status, error_message)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`
+);
+const selectLogs = db.prepare(
+  `SELECT * FROM webhook_logs ORDER BY created_at DESC LIMIT ? OFFSET ?`
+);
+const countLogs = db.prepare(`SELECT COUNT(*) as count FROM webhook_logs`);
 
 function createWebhook({ name, url, secret, filter_symbol, filter_action, filter_event_type }) {
   const id = crypto.randomUUID();
@@ -43,6 +69,14 @@ function removeWebhook(id) {
 
 function getAllWebhooks() {
   return listWebhooks.all().map(w => ({ ...w, active: !!w.active }));
+}
+
+function getWebhookLogs(limit = 50, offset = 0) {
+  return selectLogs.all(limit, offset);
+}
+
+function getWebhookLogCount() {
+  return countLogs.get().count;
 }
 
 // ── Dispatch signal to matching webhooks ────────────────────
@@ -64,8 +98,15 @@ async function dispatchSignal(signal) {
         const sig = crypto.createHmac("sha256", hook.secret).update(body).digest("hex");
         headers["X-Webhook-Signature"] = sig;
       }
-      fetch(hook.url, { method: "POST", headers, body }).catch(() => {});
-    } catch {}
+      try {
+        const resp = await fetch(hook.url, { method: "POST", headers, body });
+        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, resp.ok ? "success" : "error", resp.status, resp.ok ? null : `HTTP ${resp.status}`);
+      } catch (fetchErr) {
+        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, fetchErr.message);
+      }
+    } catch (err) {
+      insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, err.message);
+    }
   }
 }
 
@@ -85,6 +126,17 @@ async function handleWebhookRoutes(req, res, json, requireAdmin) {
   if (!url.startsWith("/api/admin/webhooks")) return false;
 
   if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
+
+  // GET /api/admin/webhooks/logs
+  if (url.startsWith("/api/admin/webhooks/logs") && method === "GET") {
+    const params = new URL(url, "http://localhost").searchParams;
+    const page = Math.max(1, parseInt(params.get("page") || "1", 10));
+    const limit = Math.min(200, Math.max(1, parseInt(params.get("limit") || "50", 10)));
+    const offset = (page - 1) * limit;
+    const data = getWebhookLogs(limit, offset);
+    const total = getWebhookLogCount();
+    return json(res, 200, { data, total, page, limit, totalPages: Math.ceil(total / limit) });
+  }
 
   // GET /api/admin/webhooks
   if (url === "/api/admin/webhooks" && method === "GET") {
