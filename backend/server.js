@@ -10,6 +10,7 @@ const http = require("http");
 const path = require("path");
 const fs = require("fs");
 const { insertSignal, getSignals, getCount } = require("./db");
+const { handleAuthRoutes, requireAuth } = require("./auth");
 // ── Config ──────────────────────────────────────────────────
 const BROKERS = (process.env.KAFKA_BROKERS || "65.108.235.150:9092").split(",");
 const TOPIC = process.env.KAFKA_TOPIC || "bridgewise.alerts.normalized";
@@ -171,11 +172,18 @@ const server = http.createServer((req, res) => {
     });
   }
 
+  // Auth routes
+  const handled = await handleAuthRoutes(req, res, json);
+  if (handled !== false) return;
+
+  // Protected API routes
   if (req.url === "/api/signals") {
+    if (!requireAuth(req)) return json(res, 401, { error: "Unauthorized" });
     return json(res, 200, getSignals(-1));
   }
 
   if (req.url === "/api/signals/latest") {
+    if (!requireAuth(req)) return json(res, 401, { error: "Unauthorized" });
     const all = getSignals(1);
     return json(res, 200, all[0] || null);
   }

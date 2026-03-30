@@ -10,7 +10,16 @@ export function useSignals(interval = 5000) {
 
   const fetchSignals = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/signals`);
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/api/signals`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.status === 401) {
+        // Token expired / invalid
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: Signal[] = await res.json();
       setSignals(data);
