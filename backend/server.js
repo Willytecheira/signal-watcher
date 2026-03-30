@@ -100,7 +100,7 @@ async function startConsumer() {
     kafkaError = null;
     console.log(`✓ Connected to Kafka: ${BROKERS.join(", ")}`);
 
-    await consumer.subscribe({ topic: TOPIC, fromBeginning: false });
+    await consumer.subscribe({ topic: TOPIC, fromBeginning: true });
 
     await consumer.run({
       eachMessage: async ({ message }) => {
