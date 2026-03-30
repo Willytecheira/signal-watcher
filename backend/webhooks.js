@@ -105,9 +105,12 @@ async function dispatchSignal(signal) {
       }
       try {
         const resp = await fetch(hook.url, { method: "POST", headers, body });
-        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, resp.ok ? "success" : "error", resp.status, resp.ok ? null : `HTTP ${resp.status}`);
+        let respBody = null;
+        try { respBody = await resp.text(); } catch {}
+        const truncated = respBody && respBody.length > 500 ? respBody.slice(0, 500) + "…" : respBody;
+        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, resp.ok ? "success" : "error", resp.status, resp.ok ? null : `HTTP ${resp.status}`, truncated);
       } catch (fetchErr) {
-        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, fetchErr.message);
+        insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, fetchErr.message, null);
       }
     } catch (err) {
       insertLog.run(hook.id, hook.name, signal.id, signal.symbol, "error", null, err.message);
