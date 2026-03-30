@@ -10,17 +10,6 @@ const http = require("http");
 const path = require("path");
 const fs = require("fs");
 const { insertSignal, getSignals, getCount } = require("./db");
- *   KAFKA_TOPIC    — topic to subscribe to (default: bridgewise.alerts.normalized)
- *   KAFKA_GROUP_ID — consumer group id (default: lovable-signals-app)
- *   PORT           — HTTP port (default: 3000)
- */
-
-const { Kafka } = require("kafkajs");
-const crypto = require("crypto");
-const http = require("http");
-const path = require("path");
-const fs = require("fs");
-
 // ── Config ──────────────────────────────────────────────────
 const BROKERS = (process.env.KAFKA_BROKERS || "65.108.235.150:9092").split(",");
 const TOPIC = process.env.KAFKA_TOPIC || "bridgewise.alerts.normalized";
