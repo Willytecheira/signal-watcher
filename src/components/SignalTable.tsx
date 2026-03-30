@@ -22,7 +22,7 @@ const actionColor: Record<string, string> = {
   NEUTRAL: "bg-muted text-muted-foreground border border-border",
 };
 
-export function SignalTable({ signals }: Props) {
+export function SignalTable({ signals, page, totalPages, total, onPageChange }: Props) {
   const [search, setSearch] = useState("");
   const [filterAction, setFilterAction] = useState("all");
   const [selected, setSelected] = useState<Signal | null>(null);
@@ -133,6 +133,58 @@ export function SignalTable({ signals }: Props) {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 px-1">
+          <p className="text-xs text-muted-foreground font-mono">
+            {total.toLocaleString()} señales · Página {page} de {totalPages}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page <= 1}
+              onClick={() => onPageChange(page - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let p: number;
+              if (totalPages <= 5) {
+                p = i + 1;
+              } else if (page <= 3) {
+                p = i + 1;
+              } else if (page >= totalPages - 2) {
+                p = totalPages - 4 + i;
+              } else {
+                p = page - 2 + i;
+              }
+              return (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8 text-xs font-mono"
+                  onClick={() => onPageChange(p)}
+                >
+                  {p}
+                </Button>
+              );
+            })}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              disabled={page >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {selected && <SignalDetail signal={selected} onClose={() => setSelected(null)} />}
     </>
