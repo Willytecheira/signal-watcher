@@ -179,17 +179,18 @@ const server = http.createServer((req, res) => {
     return json(res, 200, {
       status: kafkaConnected ? "ok" : "error",
       kafka: kafkaConnected ? "connected" : kafkaError || "disconnected",
-      signals: signals.length,
+      signals: getCount(),
       uptime: process.uptime(),
     });
   }
 
   if (req.url === "/api/signals") {
-    return json(res, 200, signals);
+    return json(res, 200, getSignals(1000));
   }
 
   if (req.url === "/api/signals/latest") {
-    return json(res, 200, signals[0] || null);
+    const all = getSignals(1);
+    return json(res, 200, all[0] || null);
   }
 
   if (hasStatic) {
