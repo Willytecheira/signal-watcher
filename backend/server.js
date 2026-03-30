@@ -129,8 +129,7 @@ async function startConsumer() {
           const raw = JSON.parse(message.value.toString());
           const signal = normalize(raw);
           if (signal) {
-            signals.unshift(signal);
-            if (signals.length > MAX_SIGNALS) signals = signals.slice(0, MAX_SIGNALS);
+            insertSignal(signal);
           }
         } catch (err) {
           console.error("⚠ Parse error:", err.message);
