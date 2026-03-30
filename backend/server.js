@@ -178,6 +178,24 @@ const server = http.createServer(async (req, res) => {
   const authHandled = await handleAuthRoutes(req, res, json);
   if (authHandled !== false) return;
 
+  // Public ingest endpoint — no auth required
+  if (req.url === "/api/signals/ingest" && req.method === "POST") {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    return req.on("end", () => {
+      try {
+        const raw = JSON.parse(body);
+        const signal = normalize(raw);
+        if (!signal) return json(res, 400, { error: "Invalid signal payload" });
+        insertSignal(signal);
+        dispatchSignal(signal);
+        return json(res, 201, { ok: true, id: signal.id });
+      } catch {
+        return json(res, 400, { error: "Invalid JSON" });
+      }
+    });
+  }
+
   // Webhook routes
   const whHandled = await handleWebhookRoutes(req, res, json, requireAdmin);
   if (whHandled !== false) return;
