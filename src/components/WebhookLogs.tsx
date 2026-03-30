@@ -14,6 +14,7 @@ interface LogEntry {
   status: string;
   http_status: number | null;
   error_message: string | null;
+  response_body: string | null;
   created_at: string;
 }
 
