@@ -78,6 +78,12 @@ export const WebhookLogs = () => {
                 {log.error_message && (
                   <p className="text-red-400/80 font-mono truncate mt-0.5">{log.error_message}</p>
                 )}
+                {log.response_body && (
+                  <details className="mt-1">
+                    <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">Ver respuesta</summary>
+                    <pre className="text-[10px] text-muted-foreground font-mono mt-1 p-2 rounded bg-muted/30 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">{log.response_body}</pre>
+                  </details>
+                )}
               </div>
               <span className="text-muted-foreground font-mono text-[10px] flex-shrink-0">
                 {new Date(log.created_at + "Z").toLocaleString()}
