@@ -9,5 +9,6 @@ Frontend fetches from VITE_API_URL env var.
 ## Memories
 - [Kafka config](mem://features/kafka) — broker, topic, group id, signal format
 - [Auth system](mem://features/auth) — SQLite JWT auth, admin user mgmt, protected routes
-- [Webhooks](mem://features/webhooks) — SQLite webhook dispatch with filters, HMAC signing, admin CRUD
-- [Normalization](mem://features/normalization) — Rules for normalizing Bridgewise Kafka messages
+- [Webhook system](mem://features/webhooks) — SQLite webhooks with filters, HMAC, dispatch logs
+- [Normalization](mem://features/normalization) — Rules for normalizing Kafka messages
+- [Client groups](mem://features/groups) — Groups with signal filters, Metabase queries, notification dispatch to endpoints

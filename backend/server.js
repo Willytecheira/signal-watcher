@@ -12,6 +12,7 @@ const fs = require("fs");
 const { insertSignal, getSignals, getCount } = require("./db");
 const { handleAuthRoutes, requireAuth, requireAdmin } = require("./auth");
 const { handleWebhookRoutes, dispatchSignal } = require("./webhooks");
+const { handleGroupRoutes, dispatchNotifications } = require("./groups");
 // ── Config ──────────────────────────────────────────────────
 const BROKERS = (process.env.KAFKA_BROKERS || "65.108.235.150:9092").split(",");
 const TOPIC = process.env.KAFKA_TOPIC || "bridgewise.alerts.normalized";
@@ -120,6 +121,7 @@ async function startConsumer() {
           if (signal) {
             insertSignal(signal);
             dispatchSignal(signal);
+            dispatchNotifications(signal);
           }
         } catch (err) {
           console.error("⚠ Parse error:", err.message);
@@ -189,6 +191,7 @@ const server = http.createServer(async (req, res) => {
         if (!signal) return json(res, 400, { error: "Invalid signal payload" });
         insertSignal(signal);
         dispatchSignal(signal);
+        dispatchNotifications(signal);
         return json(res, 201, { ok: true, id: signal.id });
       } catch {
         return json(res, 400, { error: "Invalid JSON" });
@@ -199,6 +202,10 @@ const server = http.createServer(async (req, res) => {
   // Webhook routes
   const whHandled = await handleWebhookRoutes(req, res, json, requireAdmin);
   if (whHandled !== false) return;
+
+  // Group & notification routes
+  const grHandled = await handleGroupRoutes(req, res, json, requireAdmin);
+  if (grHandled !== false) return;
 
   // Protected API routes
   if (req.url.startsWith("/api/signals") && !req.url.startsWith("/api/signals/")) {
