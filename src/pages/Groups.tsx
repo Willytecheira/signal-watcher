@@ -32,6 +32,7 @@ interface ClientGroup {
   name: string;
   description: string | null;
   endpoint_url: string | null;
+  group_type: "clients" | "broadcast";
   active: boolean;
   filters: SignalFilter[];
   metabase_queries: MetabaseQuery[];
@@ -67,6 +68,7 @@ const Groups = () => {
   const [formName, setFormName] = useState("");
   const [formDesc, setFormDesc] = useState("");
   const [formEndpoint, setFormEndpoint] = useState("");
+  const [formType, setFormType] = useState<"clients" | "broadcast">("clients");
   const [formFilters, setFormFilters] = useState<SignalFilter[]>([]);
   const [formQueries, setFormQueries] = useState<MetabaseQuery[]>([]);
 
@@ -101,6 +103,7 @@ const Groups = () => {
     setFormName("");
     setFormDesc("");
     setFormEndpoint("");
+    setFormType("clients");
     setFormFilters([]);
     setFormQueries([]);
     setEditingGroup(null);
@@ -116,6 +119,7 @@ const Groups = () => {
     setFormName(g.name);
     setFormDesc(g.description || "");
     setFormEndpoint(g.endpoint_url || "");
+    setFormType(g.group_type || "clients");
     setFormFilters(g.filters || []);
     setFormQueries(g.metabase_queries?.map(q => ({ question_id: q.question_id, label: q.label || "" })) || []);
     setEditingGroup(g);
@@ -128,6 +132,7 @@ const Groups = () => {
       name: formName.trim(),
       description: formDesc.trim() || null,
       endpoint_url: formEndpoint.trim() || null,
+      group_type: formType,
       active: true,
       filters: formFilters,
     };
