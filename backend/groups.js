@@ -71,10 +71,13 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_group_filters_group ON group_signal_filt
 
 // ── Prepared statements ─────────────────────────────────────
 const insertGroup = db.prepare(
-  `INSERT INTO client_groups (id, name, description, endpoint_url, active) VALUES (?, ?, ?, ?, ?)`
+  `INSERT INTO client_groups (id, name, description, endpoint_url, group_type, active) VALUES (?, ?, ?, ?, ?, ?)`
 );
 const updateGroup = db.prepare(
-  `UPDATE client_groups SET name=?, description=?, endpoint_url=?, active=? WHERE id=?`
+  `UPDATE client_groups SET name=?, description=?, endpoint_url=?, group_type=?, active=? WHERE id=?`
+);
+const updateGroupStmt = db.prepare(
+  `UPDATE client_groups SET name=?, description=?, endpoint_url=?, group_type=?, active=? WHERE id=?`
 );
 const deleteGroup = db.prepare(`DELETE FROM client_groups WHERE id = ?`);
 const listGroups = db.prepare(`SELECT * FROM client_groups ORDER BY created_at DESC`);
