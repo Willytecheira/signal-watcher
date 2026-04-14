@@ -63,6 +63,7 @@ const Groups = () => {
   const [creating, setCreating] = useState(false);
   const [examplePayload, setExamplePayload] = useState<object | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [filterOptions, setFilterOptions] = useState<{ symbols: string[]; event_types: string[]; event_names: string[]; actions: string[] }>({ symbols: [], event_types: [], event_names: [], actions: ["BUY", "SELL", "NEUTRAL"] });
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -93,11 +94,17 @@ const Groups = () => {
     if (res.ok) setExamplePayload(await res.json());
   }, [token]);
 
+  const fetchFilterOptions = useCallback(async () => {
+    const res = await fetch(`${API_URL}/api/signals/filter-options`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) setFilterOptions(await res.json());
+  }, [token]);
+
   useEffect(() => {
     fetchGroups();
     fetchLogs();
     fetchExamplePayload();
-  }, [fetchGroups, fetchLogs, fetchExamplePayload]);
+    fetchFilterOptions();
+  }, [fetchGroups, fetchLogs, fetchExamplePayload, fetchFilterOptions]);
 
   const resetForm = () => {
     setFormName("");
