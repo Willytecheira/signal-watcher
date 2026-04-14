@@ -231,10 +231,20 @@ const Groups = () => {
                   <Button variant="ghost" size="icon" onClick={resetForm} className="h-7 w-7"><X className="h-4 w-4" /></Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Nombre</label>
                     <Input value={formName} onChange={e => setFormName(e.target.value)} placeholder="Premium Traders" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Tipo de Grupo</label>
+                    <Select value={formType} onValueChange={v => setFormType(v as "clients" | "broadcast")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="clients">Clientes (Metabase)</SelectItem>
+                        <SelectItem value="broadcast">General (Broadcast)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Endpoint URL</label>
