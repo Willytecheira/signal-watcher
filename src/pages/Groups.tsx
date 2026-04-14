@@ -23,8 +23,15 @@ interface SignalFilter {
 
 interface MetabaseQuery {
   id?: string;
+  connection_id?: string;
   question_id: number;
   label: string;
+}
+
+interface MetabaseConnection {
+  id: string;
+  name: string;
+  base_url: string;
 }
 
 interface ClientGroup {
