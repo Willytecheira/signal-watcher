@@ -23,8 +23,15 @@ interface SignalFilter {
 
 interface MetabaseQuery {
   id?: string;
+  connection_id?: string;
   question_id: number;
   label: string;
+}
+
+interface MetabaseConnection {
+  id: string;
+  name: string;
+  base_url: string;
 }
 
 interface ClientGroup {
@@ -64,6 +71,7 @@ const Groups = () => {
   const [examplePayload, setExamplePayload] = useState<object | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState<{ symbols: string[]; event_types: string[]; event_names: string[]; actions: string[] }>({ symbols: [], event_types: [], event_names: [], actions: ["BUY", "SELL", "NEUTRAL"] });
+  const [metabaseConnections, setMetabaseConnections] = useState<MetabaseConnection[]>([]);
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -99,12 +107,18 @@ const Groups = () => {
     if (res.ok) setFilterOptions(await res.json());
   }, [token]);
 
+  const fetchMetabaseConnections = useCallback(async () => {
+    const res = await fetch(`${API_URL}/api/admin/metabase/connections`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) setMetabaseConnections(await res.json());
+  }, [token]);
+
   useEffect(() => {
     fetchGroups();
     fetchLogs();
     fetchExamplePayload();
     fetchFilterOptions();
-  }, [fetchGroups, fetchLogs, fetchExamplePayload, fetchFilterOptions]);
+    fetchMetabaseConnections();
+  }, [fetchGroups, fetchLogs, fetchExamplePayload, fetchFilterOptions, fetchMetabaseConnections]);
 
   const resetForm = () => {
     setFormName("");
@@ -128,7 +142,7 @@ const Groups = () => {
     setFormEndpoint(g.endpoint_url || "");
     setFormType(g.group_type || "clients");
     setFormFilters(g.filters || []);
-    setFormQueries(g.metabase_queries?.map(q => ({ question_id: q.question_id, label: q.label || "" })) || []);
+    setFormQueries(g.metabase_queries?.map(q => ({ connection_id: q.connection_id || "", question_id: q.question_id, label: q.label || "" })) || []);
     setEditingGroup(g);
     setCreating(false);
   };
@@ -191,7 +205,7 @@ const Groups = () => {
     setFormFilters(updated);
   };
 
-  const addQuery = () => setFormQueries([...formQueries, { question_id: 0, label: "" }]);
+  const addQuery = () => setFormQueries([...formQueries, { connection_id: "", question_id: 0, label: "" }]);
   const removeQuery = (idx: number) => setFormQueries(formQueries.filter((_, i) => i !== idx));
 
   const isFormOpen = creating || editingGroup;
@@ -311,15 +325,33 @@ const Groups = () => {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-muted-foreground flex items-center gap-1"><Globe className="h-3 w-3" /> Queries de Metabase</label>
-                    <Button variant="outline" size="sm" onClick={addQuery} className="h-7 text-xs gap-1"><Plus className="h-3 w-3" /> Query</Button>
+                    <div className="flex gap-2">
+                      <Link to="/settings/metabase" className="text-xs text-primary hover:underline self-center">Gestionar conexiones</Link>
+                      <Button variant="outline" size="sm" onClick={addQuery} className="h-7 text-xs gap-1"><Plus className="h-3 w-3" /> Query</Button>
+                    </div>
                   </div>
+                  {metabaseConnections.length === 0 && formQueries.length > 0 && (
+                    <p className="text-xs text-amber-400 mb-2">⚠ No hay conexiones de Metabase configuradas. <Link to="/settings/metabase" className="text-primary hover:underline">Crear una</Link></p>
+                  )}
                   {formQueries.map((q, idx) => (
                     <div key={idx} className="flex gap-2 items-center mb-2">
+                      <Select value={q.connection_id || ""} onValueChange={v => {
+                        const updated = [...formQueries];
+                        updated[idx] = { ...updated[idx], connection_id: v };
+                        setFormQueries(updated);
+                      }}>
+                        <SelectTrigger className="w-44"><SelectValue placeholder="Conexión..." /></SelectTrigger>
+                        <SelectContent>
+                          {metabaseConnections.map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Input type="number" value={q.question_id || ""} onChange={e => {
                         const updated = [...formQueries];
                         updated[idx] = { ...updated[idx], question_id: parseInt(e.target.value) || 0 };
                         setFormQueries(updated);
-                      }} placeholder="Question ID" className="w-32" />
+                      }} placeholder="Question ID" className="w-28" />
                       <Input value={q.label} onChange={e => {
                         const updated = [...formQueries];
                         updated[idx] = { ...updated[idx], label: e.target.value };
@@ -401,9 +433,15 @@ const Groups = () => {
                         <div>
                           <span className="text-xs text-muted-foreground mb-1 block">Metabase Queries:</span>
                           <div className="flex flex-wrap gap-1">
-                            {g.metabase_queries.map((q, i) => (
-                              <Badge key={i} variant="outline" className="text-xs">#{q.question_id} {q.label && `— ${q.label}`}</Badge>
-                            ))}
+                            {g.metabase_queries.map((q: any, i: number) => {
+                              const connName = metabaseConnections.find(c => c.id === q.connection_id)?.name;
+                              return (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  {connName && <span className="text-primary mr-1">[{connName}]</span>}
+                                  #{q.question_id} {q.label && `— ${q.label}`}
+                                </Badge>
+                              );
+                            })}
                           </div>
                         </div>
                       )}

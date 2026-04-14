@@ -17,9 +17,7 @@ db.exec(`
 // Migration: add group_type column if missing
 try {
   db.exec(`ALTER TABLE client_groups ADD COLUMN group_type TEXT NOT NULL DEFAULT 'clients'`);
-} catch (e) {
-  // Column already exists
-}
+} catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS group_signal_filters (
@@ -31,24 +29,45 @@ db.exec(`
   )
 `);
 
+// ── Multiple Metabase Connections ───────────────────────────
 db.exec(`
-  CREATE TABLE IF NOT EXISTS metabase_config (
-    id TEXT PRIMARY KEY DEFAULT 'default',
-    base_url TEXT,
-    api_token TEXT,
+  CREATE TABLE IF NOT EXISTS metabase_connections (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    base_url TEXT NOT NULL,
+    api_token TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   )
 `);
+
+// Migrate old single config to new connections table
+try {
+  const oldConfig = db.prepare(`SELECT * FROM metabase_config WHERE id = 'default'`).get();
+  if (oldConfig && oldConfig.base_url) {
+    const exists = db.prepare(`SELECT COUNT(*) as c FROM metabase_connections`).get();
+    if (exists.c === 0) {
+      db.prepare(`INSERT INTO metabase_connections (id, name, base_url, api_token) VALUES (?, ?, ?, ?)`)
+        .run('migrated-default', 'Metabase (migrado)', oldConfig.base_url, oldConfig.api_token || '');
+    }
+  }
+} catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS metabase_queries (
     id TEXT PRIMARY KEY,
     group_id TEXT NOT NULL REFERENCES client_groups(id) ON DELETE CASCADE,
+    connection_id TEXT REFERENCES metabase_connections(id),
     question_id INTEGER NOT NULL,
     label TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   )
 `);
+
+// Migration: add connection_id column to metabase_queries if missing
+try {
+  db.exec(`ALTER TABLE metabase_queries ADD COLUMN connection_id TEXT REFERENCES metabase_connections(id)`);
+} catch (e) {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS notification_logs (
@@ -86,14 +105,19 @@ const insertFilter = db.prepare(
 const deleteFiltersByGroup = db.prepare(`DELETE FROM group_signal_filters WHERE group_id = ?`);
 const getFiltersByGroup = db.prepare(`SELECT * FROM group_signal_filters WHERE group_id = ?`);
 
-const upsertMetabase = db.prepare(
-  `INSERT INTO metabase_config (id, base_url, api_token, updated_at) VALUES ('default', ?, ?, datetime('now'))
-   ON CONFLICT(id) DO UPDATE SET base_url=excluded.base_url, api_token=excluded.api_token, updated_at=datetime('now')`
+// Metabase connections
+const insertConnection = db.prepare(
+  `INSERT INTO metabase_connections (id, name, base_url, api_token) VALUES (?, ?, ?, ?)`
 );
-const getMetabaseConfig = db.prepare(`SELECT * FROM metabase_config WHERE id = 'default'`);
+const updateConnection = db.prepare(
+  `UPDATE metabase_connections SET name=?, base_url=?, api_token=?, updated_at=datetime('now') WHERE id=?`
+);
+const deleteConnection = db.prepare(`DELETE FROM metabase_connections WHERE id = ?`);
+const listConnections = db.prepare(`SELECT id, name, base_url, created_at, updated_at FROM metabase_connections ORDER BY created_at DESC`);
+const getConnectionById = db.prepare(`SELECT * FROM metabase_connections WHERE id = ?`);
 
 const insertQuery = db.prepare(
-  `INSERT INTO metabase_queries (id, group_id, question_id, label) VALUES (?, ?, ?, ?)`
+  `INSERT INTO metabase_queries (id, group_id, connection_id, question_id, label) VALUES (?, ?, ?, ?, ?)`
 );
 const deleteQueriesByGroup = db.prepare(`DELETE FROM metabase_queries WHERE group_id = ?`);
 const getQueriesByGroup = db.prepare(`SELECT * FROM metabase_queries WHERE group_id = ?`);
@@ -153,37 +177,62 @@ function getGroup(id) {
   return g;
 }
 
-// ── Metabase config ─────────────────────────────────────────
-function saveMetabaseConfig({ base_url, api_token }) {
-  upsertMetabase.run(base_url, api_token);
+// ── Metabase Connections CRUD ───────────────────────────────
+function createConnection({ name, base_url, api_token }) {
+  const id = crypto.randomUUID();
+  insertConnection.run(id, name, base_url, api_token);
+  return { id, name, base_url };
 }
 
-function loadMetabaseConfig() {
-  return getMetabaseConfig.get() || null;
+function editConnection(id, { name, base_url, api_token }) {
+  updateConnection.run(name, base_url, api_token, id);
+}
+
+function removeConnection(id) {
+  // Nullify references in queries
+  db.prepare(`UPDATE metabase_queries SET connection_id = NULL WHERE connection_id = ?`).run(id);
+  return deleteConnection.run(id).changes > 0;
+}
+
+function getAllConnections() {
+  return listConnections.all();
+}
+
+function getConnection(id) {
+  return getConnectionById.get(id) || null;
 }
 
 function saveGroupQueries(groupId, queries) {
   deleteQueriesByGroup.run(groupId);
   for (const q of queries) {
-    insertQuery.run(crypto.randomUUID(), groupId, q.question_id, q.label || null);
+    insertQuery.run(crypto.randomUUID(), groupId, q.connection_id || null, q.question_id, q.label || null);
   }
 }
 
 // ── Metabase API helper ─────────────────────────────────────
-async function queryMetabase(questionId) {
-  const config = loadMetabaseConfig();
-  if (!config || !config.base_url || !config.api_token) return null;
+async function queryMetabaseWithConnection(connectionId, questionId) {
+  const conn = getConnectionById.get(connectionId);
+  if (!conn || !conn.base_url || !conn.api_token) return null;
 
-  const url = `${config.base_url.replace(/\/$/, "")}/api/card/${questionId}/query/json`;
+  const url = `${conn.base_url.replace(/\/$/, "")}/api/card/${questionId}/query/json`;
   try {
     const resp = await fetch(url, {
-      headers: { "X-Metabase-Session": config.api_token },
+      headers: { "X-Metabase-Session": conn.api_token },
     });
     if (!resp.ok) return null;
     return await resp.json();
   } catch {
     return null;
   }
+}
+
+// Fallback: try first available connection
+async function queryMetabaseFallback(questionId) {
+  const conns = listConnections.all();
+  if (conns.length === 0) return null;
+  const conn = getConnectionById.get(conns[0].id);
+  if (!conn) return null;
+  return queryMetabaseWithConnection(conn.id, questionId);
 }
 
 // ── Notification dispatch ───────────────────────────────────
@@ -207,15 +256,18 @@ async function dispatchNotifications(signal) {
     if (!matchesGroupFilters(group, signal)) continue;
     if (!group.endpoint_url) continue;
 
-    // Broadcast groups send signal without client-specific data
     let clients = [];
     if (group.group_type === "broadcast") {
       clients = [{ id: null, name: "broadcast" }];
     } else {
-      // Fetch clients from Metabase if configured
       const queries = getQueriesByGroup.all(group.id);
       for (const q of queries) {
-        const rows = await queryMetabase(q.question_id);
+        let rows;
+        if (q.connection_id) {
+          rows = await queryMetabaseWithConnection(q.connection_id, q.question_id);
+        } else {
+          rows = await queryMetabaseFallback(q.question_id);
+        }
         if (rows && Array.isArray(rows)) {
           clients.push(...rows);
         }
@@ -228,25 +280,17 @@ async function dispatchNotifications(signal) {
     for (const client of clients) {
       const payload = {
         signal: {
-          id: signal.id,
-          symbol: signal.symbol,
-          action: signal.action,
-          confidence: signal.confidence,
-          eventName: signal.eventName,
-          eventType: signal.eventType,
-          title: signal.title,
-          description: signal.description,
-          timestamp: signal.timestamp,
+          id: signal.id, symbol: signal.symbol, action: signal.action,
+          confidence: signal.confidence, eventName: signal.eventName,
+          eventType: signal.eventType, title: signal.title,
+          description: signal.description, timestamp: signal.timestamp,
         },
         client: {
           id: client.id || client.client_id || null,
           name: client.name || client.client_name || null,
           email: client.email || client.client_email || null,
         },
-        group: {
-          id: group.id,
-          name: group.name,
-        },
+        group: { id: group.id, name: group.name },
         sent_at: new Date().toISOString(),
       };
 
@@ -287,26 +331,47 @@ async function handleGroupRoutes(req, res, json, requireAdmin) {
   const url = req.url;
   const method = req.method;
 
-  // ── Metabase config ──
-  if (url === "/api/admin/metabase" && method === "GET") {
+  // ── Metabase Connections CRUD ──
+  if (url === "/api/admin/metabase/connections" && method === "GET") {
     if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
-    const config = loadMetabaseConfig();
-    return json(res, 200, config || { base_url: null, api_token: null });
+    return json(res, 200, getAllConnections());
   }
-  if (url === "/api/admin/metabase" && method === "PUT") {
+  if (url === "/api/admin/metabase/connections" && method === "POST") {
     if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
+    const body = await readBody(req);
+    if (!body || !body.name || !body.base_url) return json(res, 400, { error: "Missing name or base_url" });
+    const conn = createConnection(body);
+    return json(res, 201, conn);
+  }
+  if (url.match(/^\/api\/admin\/metabase\/connections\/[^/]+$/) && method === "PUT") {
+    if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
+    const id = url.split("/api/admin/metabase/connections/")[1];
     const body = await readBody(req);
     if (!body) return json(res, 400, { error: "Invalid body" });
-    saveMetabaseConfig(body);
+    editConnection(id, body);
     return json(res, 200, { ok: true });
   }
-  if (url === "/api/admin/metabase/test" && method === "POST") {
+  if (url.match(/^\/api\/admin\/metabase\/connections\/[^/]+$/) && method === "DELETE") {
     if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
+    const id = url.split("/api/admin/metabase/connections/")[1];
+    const deleted = removeConnection(id);
+    return json(res, 200, { deleted });
+  }
+  if (url.match(/^\/api\/admin\/metabase\/connections\/[^/]+\/test$/) && method === "POST") {
+    if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
+    const id = url.split("/api/admin/metabase/connections/")[1].replace("/test", "");
     const body = await readBody(req);
     if (!body || !body.question_id) return json(res, 400, { error: "Missing question_id" });
-    const data = await queryMetabase(body.question_id);
+    const data = await queryMetabaseWithConnection(id, body.question_id);
     if (!data) return json(res, 500, { error: "Failed to query Metabase" });
     return json(res, 200, { rows: data.length, sample: data.slice(0, 5) });
+  }
+
+  // Keep old metabase config endpoint for backwards compat (redirect to connections)
+  if (url === "/api/admin/metabase" && method === "GET") {
+    if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
+    const conns = getAllConnections();
+    return json(res, 200, conns.length > 0 ? { base_url: conns[0].base_url, api_token: "***" } : { base_url: null, api_token: null });
   }
 
   // ── Notification logs ──
@@ -336,12 +401,10 @@ async function handleGroupRoutes(req, res, json, requireAdmin) {
   if (!url.startsWith("/api/admin/groups")) return false;
   if (!requireAdmin(req)) return json(res, 403, { error: "Forbidden" });
 
-  // GET /api/admin/groups
   if (url === "/api/admin/groups" && method === "GET") {
     return json(res, 200, getAllGroups());
   }
 
-  // GET /api/admin/groups/:id
   if (url.match(/^\/api\/admin\/groups\/[^/]+$/) && method === "GET") {
     const id = url.split("/api/admin/groups/")[1];
     const group = getGroup(id);
@@ -349,7 +412,6 @@ async function handleGroupRoutes(req, res, json, requireAdmin) {
     return json(res, 200, group);
   }
 
-  // POST /api/admin/groups
   if (url === "/api/admin/groups" && method === "POST") {
     const body = await readBody(req);
     if (!body || !body.name) return json(res, 400, { error: "Missing name" });
@@ -357,7 +419,6 @@ async function handleGroupRoutes(req, res, json, requireAdmin) {
     return json(res, 201, g);
   }
 
-  // PUT /api/admin/groups/:id
   if (url.match(/^\/api\/admin\/groups\/[^/]+$/) && method === "PUT") {
     const id = url.split("/api/admin/groups/")[1];
     const body = await readBody(req);
@@ -366,7 +427,6 @@ async function handleGroupRoutes(req, res, json, requireAdmin) {
     return json(res, 200, { ok: true });
   }
 
-  // PUT /api/admin/groups/:id/queries
   if (url.match(/^\/api\/admin\/groups\/[^/]+\/queries$/) && method === "PUT") {
     const id = url.split("/api/admin/groups/")[1].replace("/queries", "");
     const body = await readBody(req);
@@ -375,7 +435,6 @@ async function handleGroupRoutes(req, res, json, requireAdmin) {
     return json(res, 200, { ok: true });
   }
 
-  // DELETE /api/admin/groups/:id
   if (url.match(/^\/api\/admin\/groups\/[^/]+$/) && method === "DELETE") {
     const id = url.split("/api/admin/groups/")[1];
     const deleted = removeGroup(id);
