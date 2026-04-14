@@ -207,19 +207,22 @@ async function dispatchNotifications(signal) {
     if (!matchesGroupFilters(group, signal)) continue;
     if (!group.endpoint_url) continue;
 
-    // Fetch clients from Metabase if configured
-    const queries = getQueriesByGroup.all(group.id);
+    // Broadcast groups send signal without client-specific data
     let clients = [];
-    for (const q of queries) {
-      const rows = await queryMetabase(q.question_id);
-      if (rows && Array.isArray(rows)) {
-        clients.push(...rows);
-      }
-    }
-
-    // If no Metabase queries, send signal without client data
-    if (clients.length === 0) {
+    if (group.group_type === "broadcast") {
       clients = [{ id: null, name: "broadcast" }];
+    } else {
+      // Fetch clients from Metabase if configured
+      const queries = getQueriesByGroup.all(group.id);
+      for (const q of queries) {
+        const rows = await queryMetabase(q.question_id);
+        if (rows && Array.isArray(rows)) {
+          clients.push(...rows);
+        }
+      }
+      if (clients.length === 0) {
+        clients = [{ id: null, name: "no_clients" }];
+      }
     }
 
     for (const client of clients) {
