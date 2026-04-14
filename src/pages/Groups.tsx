@@ -142,7 +142,7 @@ const Groups = () => {
     setFormEndpoint(g.endpoint_url || "");
     setFormType(g.group_type || "clients");
     setFormFilters(g.filters || []);
-    setFormQueries(g.metabase_queries?.map(q => ({ question_id: q.question_id, label: q.label || "" })) || []);
+    setFormQueries(g.metabase_queries?.map(q => ({ connection_id: q.connection_id || "", question_id: q.question_id, label: q.label || "" })) || []);
     setEditingGroup(g);
     setCreating(false);
   };
