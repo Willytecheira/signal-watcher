@@ -347,6 +347,9 @@ const Groups = () => {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-foreground font-semibold">{g.name}</span>
+                          <Badge variant={g.group_type === "broadcast" ? "default" : "outline"} className="text-xs">
+                            {g.group_type === "broadcast" ? "General" : "Clientes"}
+                          </Badge>
                           {g.filters.length > 0 && <Badge variant="secondary" className="text-xs">{g.filters.length} filtros</Badge>}
                           {g.metabase_queries?.length > 0 && <Badge variant="outline" className="text-xs">{g.metabase_queries.length} queries</Badge>}
                         </div>
