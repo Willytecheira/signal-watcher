@@ -325,15 +325,33 @@ const Groups = () => {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-muted-foreground flex items-center gap-1"><Globe className="h-3 w-3" /> Queries de Metabase</label>
-                    <Button variant="outline" size="sm" onClick={addQuery} className="h-7 text-xs gap-1"><Plus className="h-3 w-3" /> Query</Button>
+                    <div className="flex gap-2">
+                      <Link to="/settings/metabase" className="text-xs text-primary hover:underline self-center">Gestionar conexiones</Link>
+                      <Button variant="outline" size="sm" onClick={addQuery} className="h-7 text-xs gap-1"><Plus className="h-3 w-3" /> Query</Button>
+                    </div>
                   </div>
+                  {metabaseConnections.length === 0 && formQueries.length > 0 && (
+                    <p className="text-xs text-amber-400 mb-2">⚠ No hay conexiones de Metabase configuradas. <Link to="/settings/metabase" className="text-primary hover:underline">Crear una</Link></p>
+                  )}
                   {formQueries.map((q, idx) => (
                     <div key={idx} className="flex gap-2 items-center mb-2">
+                      <Select value={q.connection_id || ""} onValueChange={v => {
+                        const updated = [...formQueries];
+                        updated[idx] = { ...updated[idx], connection_id: v };
+                        setFormQueries(updated);
+                      }}>
+                        <SelectTrigger className="w-44"><SelectValue placeholder="Conexión..." /></SelectTrigger>
+                        <SelectContent>
+                          {metabaseConnections.map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Input type="number" value={q.question_id || ""} onChange={e => {
                         const updated = [...formQueries];
                         updated[idx] = { ...updated[idx], question_id: parseInt(e.target.value) || 0 };
                         setFormQueries(updated);
-                      }} placeholder="Question ID" className="w-32" />
+                      }} placeholder="Question ID" className="w-28" />
                       <Input value={q.label} onChange={e => {
                         const updated = [...formQueries];
                         updated[idx] = { ...updated[idx], label: e.target.value };
