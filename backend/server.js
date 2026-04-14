@@ -207,6 +207,12 @@ const server = http.createServer(async (req, res) => {
   const grHandled = await handleGroupRoutes(req, res, json, requireAdmin);
   if (grHandled !== false) return;
 
+  // Filter options (distinct values from signals)
+  if (req.url === "/api/signals/filter-options") {
+    if (!requireAuth(req)) return json(res, 401, { error: "Unauthorized" });
+    return json(res, 200, getFilterOptions());
+  }
+
   // Protected API routes
   if (req.url.startsWith("/api/signals") && !req.url.startsWith("/api/signals/")) {
     if (!requireAuth(req)) return json(res, 401, { error: "Unauthorized" });
