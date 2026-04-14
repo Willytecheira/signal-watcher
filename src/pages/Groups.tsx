@@ -107,12 +107,18 @@ const Groups = () => {
     if (res.ok) setFilterOptions(await res.json());
   }, [token]);
 
+  const fetchMetabaseConnections = useCallback(async () => {
+    const res = await fetch(`${API_URL}/api/admin/metabase/connections`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) setMetabaseConnections(await res.json());
+  }, [token]);
+
   useEffect(() => {
     fetchGroups();
     fetchLogs();
     fetchExamplePayload();
     fetchFilterOptions();
-  }, [fetchGroups, fetchLogs, fetchExamplePayload, fetchFilterOptions]);
+    fetchMetabaseConnections();
+  }, [fetchGroups, fetchLogs, fetchExamplePayload, fetchFilterOptions, fetchMetabaseConnections]);
 
   const resetForm = () => {
     setFormName("");
