@@ -61,4 +61,17 @@ function getCount() {
   return countStmt.get().count;
 }
 
-module.exports = { insertSignal, getSignals, getCount, db };
+const distinctSymbols = db.prepare(`SELECT DISTINCT symbol FROM signals WHERE symbol IS NOT NULL ORDER BY symbol`);
+const distinctEventTypes = db.prepare(`SELECT DISTINCT event_type FROM signals WHERE event_type IS NOT NULL ORDER BY event_type`);
+const distinctEventNames = db.prepare(`SELECT DISTINCT event_name FROM signals WHERE event_name IS NOT NULL ORDER BY event_name`);
+
+function getFilterOptions() {
+  return {
+    symbols: distinctSymbols.all().map(r => r.symbol),
+    event_types: distinctEventTypes.all().map(r => r.event_type),
+    event_names: distinctEventNames.all().map(r => r.event_name),
+    actions: ["BUY", "SELL", "NEUTRAL"],
+  };
+}
+
+module.exports = { insertSignal, getSignals, getCount, getFilterOptions, db };

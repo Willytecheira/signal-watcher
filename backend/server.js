@@ -9,7 +9,7 @@ const crypto = require("crypto");
 const http = require("http");
 const path = require("path");
 const fs = require("fs");
-const { insertSignal, getSignals, getCount } = require("./db");
+const { insertSignal, getSignals, getCount, getFilterOptions } = require("./db");
 const { handleAuthRoutes, requireAuth, requireAdmin } = require("./auth");
 const { handleWebhookRoutes, dispatchSignal } = require("./webhooks");
 const { handleGroupRoutes, dispatchNotifications } = require("./groups");
@@ -206,6 +206,12 @@ const server = http.createServer(async (req, res) => {
   // Group & notification routes
   const grHandled = await handleGroupRoutes(req, res, json, requireAdmin);
   if (grHandled !== false) return;
+
+  // Filter options (distinct values from signals)
+  if (req.url === "/api/signals/filter-options") {
+    if (!requireAuth(req)) return json(res, 401, { error: "Unauthorized" });
+    return json(res, 200, getFilterOptions());
+  }
 
   // Protected API routes
   if (req.url.startsWith("/api/signals") && !req.url.startsWith("/api/signals/")) {
