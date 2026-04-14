@@ -271,7 +271,7 @@ const Groups = () => {
                   </div>
                   {formFilters.map((f, idx) => (
                     <div key={idx} className="flex gap-2 items-center mb-2">
-                      <Select value={f.filter_type} onValueChange={v => updateFilter(idx, "filter_type", v)}>
+                      <Select value={f.filter_type} onValueChange={v => { updateFilter(idx, "filter_type", v); updateFilter(idx, "filter_value", ""); }}>
                         <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="symbol">Símbolo</SelectItem>
@@ -280,18 +280,27 @@ const Groups = () => {
                           <SelectItem value="event_name">Nombre Evento</SelectItem>
                         </SelectContent>
                       </Select>
-                      {f.filter_type === "action" ? (
-                        <Select value={f.filter_value} onValueChange={v => updateFilter(idx, "filter_value", v)}>
-                          <SelectTrigger className="flex-1"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="BUY">BUY</SelectItem>
-                            <SelectItem value="SELL">SELL</SelectItem>
-                            <SelectItem value="NEUTRAL">NEUTRAL</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input value={f.filter_value} onChange={e => updateFilter(idx, "filter_value", e.target.value)} placeholder="Valor..." className="flex-1" />
-                      )}
+                      {(() => {
+                        const optionsMap: Record<string, string[]> = {
+                          symbol: filterOptions.symbols,
+                          action: filterOptions.actions,
+                          event_type: filterOptions.event_types,
+                          event_name: filterOptions.event_names,
+                        };
+                        const options = optionsMap[f.filter_type] || [];
+                        return options.length > 0 ? (
+                          <Select value={f.filter_value} onValueChange={v => updateFilter(idx, "filter_value", v)}>
+                            <SelectTrigger className="flex-1"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                            <SelectContent>
+                              {options.map(opt => (
+                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input value={f.filter_value} onChange={e => updateFilter(idx, "filter_value", e.target.value)} placeholder="Valor..." className="flex-1" />
+                        );
+                      })()}
                       <Button variant="ghost" size="icon" onClick={() => removeFilter(idx)} className="h-8 w-8 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   ))}
