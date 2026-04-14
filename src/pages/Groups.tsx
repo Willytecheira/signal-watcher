@@ -71,6 +71,7 @@ const Groups = () => {
   const [examplePayload, setExamplePayload] = useState<object | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState<{ symbols: string[]; event_types: string[]; event_names: string[]; actions: string[] }>({ symbols: [], event_types: [], event_names: [], actions: ["BUY", "SELL", "NEUTRAL"] });
+  const [metabaseConnections, setMetabaseConnections] = useState<MetabaseConnection[]>([]);
 
   // Form state
   const [formName, setFormName] = useState("");
