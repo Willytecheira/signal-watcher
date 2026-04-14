@@ -8,10 +8,18 @@ db.exec(`
     name TEXT NOT NULL,
     description TEXT,
     endpoint_url TEXT,
+    group_type TEXT NOT NULL DEFAULT 'clients',
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now'))
   )
 `);
+
+// Migration: add group_type column if missing
+try {
+  db.exec(`ALTER TABLE client_groups ADD COLUMN group_type TEXT NOT NULL DEFAULT 'clients'`);
+} catch (e) {
+  // Column already exists
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS group_signal_filters (
