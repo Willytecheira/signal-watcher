@@ -76,9 +76,6 @@ const insertGroup = db.prepare(
 const updateGroup = db.prepare(
   `UPDATE client_groups SET name=?, description=?, endpoint_url=?, group_type=?, active=? WHERE id=?`
 );
-const updateGroupStmt = db.prepare(
-  `UPDATE client_groups SET name=?, description=?, endpoint_url=?, group_type=?, active=? WHERE id=?`
-);
 const deleteGroup = db.prepare(`DELETE FROM client_groups WHERE id = ?`);
 const listGroups = db.prepare(`SELECT * FROM client_groups ORDER BY created_at DESC`);
 const getGroupById = db.prepare(`SELECT * FROM client_groups WHERE id = ?`);
@@ -109,19 +106,19 @@ const selectNotifLogs = db.prepare(`SELECT * FROM notification_logs ORDER BY cre
 const countNotifLogs = db.prepare(`SELECT COUNT(*) as count FROM notification_logs`);
 
 // ── CRUD Functions ──────────────────────────────────────────
-function createGroup({ name, description, endpoint_url, filters }) {
+function createGroup({ name, description, endpoint_url, group_type, filters }) {
   const id = crypto.randomUUID();
-  insertGroup.run(id, name, description || null, endpoint_url || null, 1);
+  insertGroup.run(id, name, description || null, endpoint_url || null, group_type || "clients", 1);
   if (filters && Array.isArray(filters)) {
     for (const f of filters) {
       insertFilter.run(crypto.randomUUID(), id, f.filter_type, f.filter_value);
     }
   }
-  return { id, name };
+  return { id, name, group_type: group_type || "clients" };
 }
 
-function editGroup(id, { name, description, endpoint_url, active, filters }) {
-  updateGroup.run(name, description || null, endpoint_url || null, active ? 1 : 0, id);
+function editGroup(id, { name, description, endpoint_url, group_type, active, filters }) {
+  updateGroup.run(name, description || null, endpoint_url || null, group_type || "clients", active ? 1 : 0, id);
   if (filters !== undefined) {
     deleteFiltersByGroup.run(id);
     if (Array.isArray(filters)) {
