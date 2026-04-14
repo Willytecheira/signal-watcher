@@ -433,9 +433,15 @@ const Groups = () => {
                         <div>
                           <span className="text-xs text-muted-foreground mb-1 block">Metabase Queries:</span>
                           <div className="flex flex-wrap gap-1">
-                            {g.metabase_queries.map((q, i) => (
-                              <Badge key={i} variant="outline" className="text-xs">#{q.question_id} {q.label && `— ${q.label}`}</Badge>
-                            ))}
+                            {g.metabase_queries.map((q: any, i: number) => {
+                              const connName = metabaseConnections.find(c => c.id === q.connection_id)?.name;
+                              return (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  {connName && <span className="text-primary mr-1">[{connName}]</span>}
+                                  #{q.question_id} {q.label && `— ${q.label}`}
+                                </Badge>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
