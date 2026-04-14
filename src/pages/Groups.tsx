@@ -205,7 +205,7 @@ const Groups = () => {
     setFormFilters(updated);
   };
 
-  const addQuery = () => setFormQueries([...formQueries, { question_id: 0, label: "" }]);
+  const addQuery = () => setFormQueries([...formQueries, { connection_id: "", question_id: 0, label: "" }]);
   const removeQuery = (idx: number) => setFormQueries(formQueries.filter((_, i) => i !== idx));
 
   const isFormOpen = creating || editingGroup;
