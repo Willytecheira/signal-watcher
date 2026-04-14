@@ -290,7 +290,8 @@ const Groups = () => {
                   ))}
                 </div>
 
-                {/* Metabase Queries */}
+                {/* Metabase Queries — only for 'clients' type */}
+                {formType === "clients" && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-muted-foreground flex items-center gap-1"><Globe className="h-3 w-3" /> Queries de Metabase</label>
@@ -312,6 +313,16 @@ const Groups = () => {
                     </div>
                   ))}
                 </div>
+                )}
+
+                {formType === "broadcast" && (
+                  <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Grupo General (Broadcast):</strong> Las señales filtradas se enviarán al endpoint sin datos de clientes específicos. 
+                      El sistema receptor se encargará de distribuir a todos los usuarios.
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={resetForm}>Cancelar</Button>
