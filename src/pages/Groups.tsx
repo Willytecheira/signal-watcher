@@ -32,6 +32,7 @@ interface ClientGroup {
   name: string;
   description: string | null;
   endpoint_url: string | null;
+  group_type: "clients" | "broadcast";
   active: boolean;
   filters: SignalFilter[];
   metabase_queries: MetabaseQuery[];
@@ -67,6 +68,7 @@ const Groups = () => {
   const [formName, setFormName] = useState("");
   const [formDesc, setFormDesc] = useState("");
   const [formEndpoint, setFormEndpoint] = useState("");
+  const [formType, setFormType] = useState<"clients" | "broadcast">("clients");
   const [formFilters, setFormFilters] = useState<SignalFilter[]>([]);
   const [formQueries, setFormQueries] = useState<MetabaseQuery[]>([]);
 
@@ -101,6 +103,7 @@ const Groups = () => {
     setFormName("");
     setFormDesc("");
     setFormEndpoint("");
+    setFormType("clients");
     setFormFilters([]);
     setFormQueries([]);
     setEditingGroup(null);
@@ -116,6 +119,7 @@ const Groups = () => {
     setFormName(g.name);
     setFormDesc(g.description || "");
     setFormEndpoint(g.endpoint_url || "");
+    setFormType(g.group_type || "clients");
     setFormFilters(g.filters || []);
     setFormQueries(g.metabase_queries?.map(q => ({ question_id: q.question_id, label: q.label || "" })) || []);
     setEditingGroup(g);
@@ -128,6 +132,7 @@ const Groups = () => {
       name: formName.trim(),
       description: formDesc.trim() || null,
       endpoint_url: formEndpoint.trim() || null,
+      group_type: formType,
       active: true,
       filters: formFilters,
     };
@@ -226,10 +231,20 @@ const Groups = () => {
                   <Button variant="ghost" size="icon" onClick={resetForm} className="h-7 w-7"><X className="h-4 w-4" /></Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Nombre</label>
                     <Input value={formName} onChange={e => setFormName(e.target.value)} placeholder="Premium Traders" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Tipo de Grupo</label>
+                    <Select value={formType} onValueChange={v => setFormType(v as "clients" | "broadcast")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="clients">Clientes (Metabase)</SelectItem>
+                        <SelectItem value="broadcast">General (Broadcast)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Endpoint URL</label>
@@ -275,7 +290,8 @@ const Groups = () => {
                   ))}
                 </div>
 
-                {/* Metabase Queries */}
+                {/* Metabase Queries — only for 'clients' type */}
+                {formType === "clients" && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-muted-foreground flex items-center gap-1"><Globe className="h-3 w-3" /> Queries de Metabase</label>
@@ -297,6 +313,16 @@ const Groups = () => {
                     </div>
                   ))}
                 </div>
+                )}
+
+                {formType === "broadcast" && (
+                  <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Grupo General (Broadcast):</strong> Las señales filtradas se enviarán al endpoint sin datos de clientes específicos. 
+                      El sistema receptor se encargará de distribuir a todos los usuarios.
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={resetForm}>Cancelar</Button>
@@ -321,6 +347,9 @@ const Groups = () => {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-foreground font-semibold">{g.name}</span>
+                          <Badge variant={g.group_type === "broadcast" ? "default" : "outline"} className="text-xs">
+                            {g.group_type === "broadcast" ? "General" : "Clientes"}
+                          </Badge>
                           {g.filters.length > 0 && <Badge variant="secondary" className="text-xs">{g.filters.length} filtros</Badge>}
                           {g.metabase_queries?.length > 0 && <Badge variant="outline" className="text-xs">{g.metabase_queries.length} queries</Badge>}
                         </div>

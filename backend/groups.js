@@ -8,10 +8,18 @@ db.exec(`
     name TEXT NOT NULL,
     description TEXT,
     endpoint_url TEXT,
+    group_type TEXT NOT NULL DEFAULT 'clients',
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now'))
   )
 `);
+
+// Migration: add group_type column if missing
+try {
+  db.exec(`ALTER TABLE client_groups ADD COLUMN group_type TEXT NOT NULL DEFAULT 'clients'`);
+} catch (e) {
+  // Column already exists
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS group_signal_filters (
@@ -63,10 +71,10 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_group_filters_group ON group_signal_filt
 
 // ── Prepared statements ─────────────────────────────────────
 const insertGroup = db.prepare(
-  `INSERT INTO client_groups (id, name, description, endpoint_url, active) VALUES (?, ?, ?, ?, ?)`
+  `INSERT INTO client_groups (id, name, description, endpoint_url, group_type, active) VALUES (?, ?, ?, ?, ?, ?)`
 );
 const updateGroup = db.prepare(
-  `UPDATE client_groups SET name=?, description=?, endpoint_url=?, active=? WHERE id=?`
+  `UPDATE client_groups SET name=?, description=?, endpoint_url=?, group_type=?, active=? WHERE id=?`
 );
 const deleteGroup = db.prepare(`DELETE FROM client_groups WHERE id = ?`);
 const listGroups = db.prepare(`SELECT * FROM client_groups ORDER BY created_at DESC`);
@@ -98,19 +106,19 @@ const selectNotifLogs = db.prepare(`SELECT * FROM notification_logs ORDER BY cre
 const countNotifLogs = db.prepare(`SELECT COUNT(*) as count FROM notification_logs`);
 
 // ── CRUD Functions ──────────────────────────────────────────
-function createGroup({ name, description, endpoint_url, filters }) {
+function createGroup({ name, description, endpoint_url, group_type, filters }) {
   const id = crypto.randomUUID();
-  insertGroup.run(id, name, description || null, endpoint_url || null, 1);
+  insertGroup.run(id, name, description || null, endpoint_url || null, group_type || "clients", 1);
   if (filters && Array.isArray(filters)) {
     for (const f of filters) {
       insertFilter.run(crypto.randomUUID(), id, f.filter_type, f.filter_value);
     }
   }
-  return { id, name };
+  return { id, name, group_type: group_type || "clients" };
 }
 
-function editGroup(id, { name, description, endpoint_url, active, filters }) {
-  updateGroup.run(name, description || null, endpoint_url || null, active ? 1 : 0, id);
+function editGroup(id, { name, description, endpoint_url, group_type, active, filters }) {
+  updateGroup.run(name, description || null, endpoint_url || null, group_type || "clients", active ? 1 : 0, id);
   if (filters !== undefined) {
     deleteFiltersByGroup.run(id);
     if (Array.isArray(filters)) {
@@ -199,19 +207,22 @@ async function dispatchNotifications(signal) {
     if (!matchesGroupFilters(group, signal)) continue;
     if (!group.endpoint_url) continue;
 
-    // Fetch clients from Metabase if configured
-    const queries = getQueriesByGroup.all(group.id);
+    // Broadcast groups send signal without client-specific data
     let clients = [];
-    for (const q of queries) {
-      const rows = await queryMetabase(q.question_id);
-      if (rows && Array.isArray(rows)) {
-        clients.push(...rows);
-      }
-    }
-
-    // If no Metabase queries, send signal without client data
-    if (clients.length === 0) {
+    if (group.group_type === "broadcast") {
       clients = [{ id: null, name: "broadcast" }];
+    } else {
+      // Fetch clients from Metabase if configured
+      const queries = getQueriesByGroup.all(group.id);
+      for (const q of queries) {
+        const rows = await queryMetabase(q.question_id);
+        if (rows && Array.isArray(rows)) {
+          clients.push(...rows);
+        }
+      }
+      if (clients.length === 0) {
+        clients = [{ id: null, name: "no_clients" }];
+      }
     }
 
     for (const client of clients) {
