@@ -19,6 +19,21 @@ db.exec(`
   )
 `);
 
+// ── Cached external users table ─────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cached_external_users (
+    id TEXT NOT NULL,
+    source_id TEXT NOT NULL REFERENCES external_user_sources(id) ON DELETE CASCADE,
+    email TEXT,
+    full_name TEXT,
+    role TEXT,
+    raw_json TEXT,
+    cached_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (id, source_id)
+  )
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_cached_ext_users_source ON cached_external_users(source_id)`);
+
 // ── Defaults ────────────────────────────────────────────────
 const DEFAULT_URL =
   process.env.SUPABASE_MANAGE_USERS_URL ||
