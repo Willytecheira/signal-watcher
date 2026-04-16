@@ -34,15 +34,27 @@ interface MetabaseConnection {
   base_url: string;
 }
 
+interface ExternalSourceRef {
+  source_id: string;
+  role_filter: string;
+}
+
+interface ExternalSource {
+  id: string;
+  name: string;
+  function_url: string;
+}
+
 interface ClientGroup {
   id: string;
   name: string;
   description: string | null;
   endpoint_url: string | null;
-  group_type: "clients" | "broadcast";
+  group_type: "clients" | "broadcast" | "external";
   active: boolean;
   filters: SignalFilter[];
   metabase_queries: MetabaseQuery[];
+  external_sources: ExternalSourceRef[];
   created_at: string;
 }
 
