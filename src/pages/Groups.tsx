@@ -169,6 +169,7 @@ const Groups = () => {
     setFormType(g.group_type || "clients");
     setFormFilters(g.filters || []);
     setFormQueries(g.metabase_queries?.map(q => ({ connection_id: q.connection_id || "", question_id: q.question_id, label: q.label || "" })) || []);
+    setFormExtSources(g.external_sources?.map(s => ({ source_id: s.source_id, role_filter: s.role_filter || "" })) || []);
     setEditingGroup(g);
     setCreating(false);
   };
@@ -184,24 +185,29 @@ const Groups = () => {
       filters: formFilters,
     };
 
-    if (editingGroup) {
-      const res = await fetch(`${API_URL}/api/admin/groups/${editingGroup.id}`, { method: "PUT", headers, body: JSON.stringify(body) });
-      if (!res.ok) { toast.error("Error al actualizar grupo"); return; }
+    const saveExtras = async (groupId: string) => {
       if (formQueries.length > 0) {
-        await fetch(`${API_URL}/api/admin/groups/${editingGroup.id}/queries`, {
+        await fetch(`${API_URL}/api/admin/groups/${groupId}/queries`, {
           method: "PUT", headers, body: JSON.stringify({ queries: formQueries }),
         });
       }
+      if (formExtSources.length > 0) {
+        await fetch(`${API_URL}/api/admin/groups/${groupId}/external-sources`, {
+          method: "PUT", headers, body: JSON.stringify({ sources: formExtSources }),
+        });
+      }
+    };
+
+    if (editingGroup) {
+      const res = await fetch(`${API_URL}/api/admin/groups/${editingGroup.id}`, { method: "PUT", headers, body: JSON.stringify(body) });
+      if (!res.ok) { toast.error("Error al actualizar grupo"); return; }
+      await saveExtras(editingGroup.id);
       toast.success("Grupo actualizado");
     } else {
       const res = await fetch(`${API_URL}/api/admin/groups`, { method: "POST", headers, body: JSON.stringify(body) });
       if (!res.ok) { toast.error("Error al crear grupo"); return; }
       const created = await res.json();
-      if (formQueries.length > 0) {
-        await fetch(`${API_URL}/api/admin/groups/${created.id}/queries`, {
-          method: "PUT", headers, body: JSON.stringify({ queries: formQueries }),
-        });
-      }
+      await saveExtras(created.id);
       toast.success("Grupo creado");
     }
     resetForm();
