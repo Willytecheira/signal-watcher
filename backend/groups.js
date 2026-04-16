@@ -292,6 +292,7 @@ async function dispatchNotifications(signal) {
     if (group.group_type === "broadcast") {
       clients = [{ id: null, name: "broadcast" }];
     } else {
+      // Metabase queries
       const queries = getQueriesByGroup.all(group.id);
       for (const q of queries) {
         let rows;
@@ -304,6 +305,27 @@ async function dispatchNotifications(signal) {
           clients.push(...rows);
         }
       }
+
+      // External user sources
+      if (extStmts && extStmts.get) {
+        const extSources = getExtSourcesByGroup.all(group.id);
+        for (const es of extSources) {
+          const source = extStmts.get.get(es.source_id);
+          if (!source || !source.active) continue;
+          try {
+            let users = await fetchExtUsers(source);
+            if (es.role_filter) {
+              users = users.filter(u => u.role === es.role_filter);
+            }
+            clients.push(...users.map(u => ({
+              id: u.id, name: u.full_name || u.email, email: u.email
+            })));
+          } catch (err) {
+            console.error(`External source ${source.name} error:`, err.message);
+          }
+        }
+      }
+
       if (clients.length === 0) {
         clients = [{ id: null, name: "no_clients" }];
       }
