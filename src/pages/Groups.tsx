@@ -291,10 +291,11 @@ const Groups = () => {
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Tipo de Grupo</label>
-                    <Select value={formType} onValueChange={v => setFormType(v as "clients" | "broadcast")}>
+                    <Select value={formType} onValueChange={v => setFormType(v as "clients" | "broadcast" | "external")}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="clients">Clientes (Metabase)</SelectItem>
+                        <SelectItem value="external">Usuarios del Sistema</SelectItem>
                         <SelectItem value="broadcast">General (Broadcast)</SelectItem>
                       </SelectContent>
                     </Select>
