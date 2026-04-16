@@ -178,6 +178,7 @@ function editGroup(id, { name, description, endpoint_url, group_type, active, fi
 function removeGroup(id) {
   deleteFiltersByGroup.run(id);
   deleteQueriesByGroup.run(id);
+  deleteExtSourcesByGroup.run(id);
   return deleteGroup.run(id).changes > 0;
 }
 
@@ -186,6 +187,7 @@ function getAllGroups() {
   for (const g of groups) {
     g.filters = getFiltersByGroup.all(g.id);
     g.metabase_queries = getQueriesByGroup.all(g.id);
+    g.external_sources = getExtSourcesByGroup.all(g.id);
   }
   return groups;
 }
@@ -196,7 +198,15 @@ function getGroup(id) {
   g.active = !!g.active;
   g.filters = getFiltersByGroup.all(id);
   g.metabase_queries = getQueriesByGroup.all(id);
+  g.external_sources = getExtSourcesByGroup.all(id);
   return g;
+}
+
+function saveGroupExtSources(groupId, sources) {
+  deleteExtSourcesByGroup.run(groupId);
+  for (const s of sources) {
+    insertGroupExtSource.run(crypto.randomUUID(), groupId, s.source_id, s.role_filter || null);
+  }
 }
 
 // ── Metabase Connections CRUD ───────────────────────────────
