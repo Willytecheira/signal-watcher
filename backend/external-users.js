@@ -19,6 +19,21 @@ db.exec(`
   )
 `);
 
+// ── Cached external users table ─────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cached_external_users (
+    id TEXT NOT NULL,
+    source_id TEXT NOT NULL REFERENCES external_user_sources(id) ON DELETE CASCADE,
+    email TEXT,
+    full_name TEXT,
+    role TEXT,
+    raw_json TEXT,
+    cached_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (id, source_id)
+  )
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_cached_ext_users_source ON cached_external_users(source_id)`);
+
 // ── Defaults ────────────────────────────────────────────────
 const DEFAULT_URL =
   process.env.SUPABASE_MANAGE_USERS_URL ||
@@ -48,6 +63,44 @@ const stmts = {
   ),
   del: db.prepare("DELETE FROM external_user_sources WHERE id = ?"),
 };
+
+// ── Cache stmts ─────────────────────────────────────────────
+const cacheStmts = {
+  upsert: db.prepare(
+    `INSERT OR REPLACE INTO cached_external_users (id, source_id, email, full_name, role, raw_json, cached_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+  ),
+  deleteBySource: db.prepare("DELETE FROM cached_external_users WHERE source_id = ?"),
+  getBySource: db.prepare("SELECT * FROM cached_external_users WHERE source_id = ? ORDER BY full_name"),
+  getAll: db.prepare("SELECT * FROM cached_external_users ORDER BY full_name"),
+};
+
+function cacheUsersForSource(sourceId, users) {
+  cacheStmts.deleteBySource.run(sourceId);
+  for (const u of users) {
+    cacheStmts.upsert.run(
+      u.id || crypto.randomUUID(),
+      sourceId,
+      u.email || null,
+      u.full_name || null,
+      u.role || null,
+      JSON.stringify(u)
+    );
+  }
+}
+
+function getCachedUsers(sourceId) {
+  const rows = sourceId ? cacheStmts.getBySource.all(sourceId) : cacheStmts.getAll.all();
+  return rows.map(r => ({
+    id: r.id,
+    email: r.email,
+    full_name: r.full_name,
+    role: r.role,
+    _source_id: r.source_id,
+    _cached_at: r.cached_at,
+    ...(r.raw_json ? JSON.parse(r.raw_json) : {}),
+  }));
+}
 
 // ── Fetch users from a source ───────────────────────────────
 async function fetchUsersFromSource(source, bearerToken) {
@@ -82,25 +135,47 @@ function parseBody(req) {
 async function handleExternalUsersRoutes(req, res, json, requireAdmin) {
   const url = req.url.split("?")[0];
 
-  // GET /api/admin/external-users — fetch users from all active sources
+  // GET /api/admin/external-users — fetch users from all active sources & cache them
   if (url === "/api/admin/external-users" && req.method === "GET") {
     if (!requireAdmin(req)) return json(res, 403, { error: "Admin only" });
+    const useCache = req.url.includes("cache=true");
     try {
+      if (useCache) {
+        const users = getCachedUsers();
+        return json(res, 200, { users, fromCache: true });
+      }
       const sources = stmts.list.all().filter((s) => s.active);
       const allUsers = [];
       for (const src of sources) {
         try {
           const users = await fetchUsersFromSource(src, req.headers.authorization);
+          // Cache users in SQLite
+          cacheUsersForSource(src.id, users);
+          console.log(`[cache] Cached ${users.length} users from source "${src.name}"`);
           users.forEach((u) => { u._source = src.name; u._source_id = src.id; });
           allUsers.push(...users);
         } catch (err) {
           console.error(`Source ${src.name} error:`, err.message);
+          // Fallback to cache for this source
+          const cached = getCachedUsers(src.id);
+          if (cached.length > 0) {
+            console.log(`[cache] Using ${cached.length} cached users for source "${src.name}"`);
+            cached.forEach(u => { u._source = src.name + " (cache)"; });
+            allUsers.push(...cached);
+          }
         }
       }
       return json(res, 200, { users: allUsers });
     } catch (err) {
       return json(res, 502, { error: err.message });
     }
+  }
+
+  // GET /api/admin/external-users/cached — get only cached users
+  if (url === "/api/admin/external-users/cached" && req.method === "GET") {
+    if (!requireAdmin(req)) return json(res, 403, { error: "Admin only" });
+    const users = getCachedUsers();
+    return json(res, 200, { users, fromCache: true });
   }
 
   // GET /api/admin/external-users/sources — list sources
@@ -169,4 +244,4 @@ async function handleExternalUsersRoutes(req, res, json, requireAdmin) {
   return false;
 }
 
-module.exports = { handleExternalUsersRoutes, fetchUsersFromSource, stmts };
+module.exports = { handleExternalUsersRoutes, fetchUsersFromSource, stmts, cacheUsersForSource, getCachedUsers };

@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { fetchUsersFromSource: fetchExtUsers, stmts: extStmts } = (() => {
+const { fetchUsersFromSource: fetchExtUsers, stmts: extStmts, getCachedUsers } = (() => {
   try { return require("./external-users"); } catch { return {}; }
 })();
 const { db } = require("./db");
@@ -316,31 +316,41 @@ async function dispatchNotifications(signal) {
         }
       }
 
-      // External user sources
+      // External user sources — try live fetch, fallback to cache
       const extSources = getExtSourcesByGroup.all(group.id);
       console.log(`[dispatch]   → ${extSources.length} external source(s)`);
-      if (fetchExtUsers && extStmts && extStmts.get) {
-        for (const es of extSources) {
+      for (const es of extSources) {
+        let users = [];
+        // Try live fetch first
+        if (fetchExtUsers && extStmts && extStmts.get) {
           const source = extStmts.get.get(es.source_id);
-          if (!source) { console.log(`[dispatch]   → source ${es.source_id} not found`); continue; }
-          if (!source.active) { console.log(`[dispatch]   → source "${source.name}" inactive`); continue; }
-          try {
-            console.log(`[dispatch]   → fetching users from "${source.name}" (auth_token: ${source.auth_token ? 'set' : 'NOT SET'}, role_filter: ${es.role_filter || 'none'})`);
-            let users = await fetchExtUsers(source);
-            console.log(`[dispatch]   → got ${users.length} users from "${source.name}"`);
-            if (es.role_filter) {
-              users = users.filter(u => u.role === es.role_filter);
-              console.log(`[dispatch]   → after role filter "${es.role_filter}": ${users.length} users`);
+          if (!source) { console.log(`[dispatch]   → source ${es.source_id} not found`); }
+          else if (!source.active) { console.log(`[dispatch]   → source "${source.name}" inactive`); }
+          else {
+            try {
+              console.log(`[dispatch]   → fetching users from "${source.name}" (auth_token: ${source.auth_token ? 'set' : 'NOT SET'})`);
+              users = await fetchExtUsers(source);
+              console.log(`[dispatch]   → got ${users.length} users from "${source.name}"`);
+            } catch (err) {
+              console.error(`[dispatch]   → live fetch failed for "${source.name}":`, err.message);
             }
-            clients.push(...users.map(u => ({
-              id: u.id, name: u.full_name || u.email, email: u.email
-            })));
-          } catch (err) {
-            console.error(`[dispatch]   → External source "${source.name}" error:`, err.message);
           }
         }
-      } else {
-        console.log(`[dispatch]   → external users module not available (fetchExtUsers: ${!!fetchExtUsers}, extStmts: ${!!extStmts})`);
+        // Fallback to cached users
+        if (users.length === 0 && getCachedUsers) {
+          users = getCachedUsers(es.source_id);
+          if (users.length > 0) {
+            console.log(`[dispatch]   → using ${users.length} CACHED users for source ${es.source_id}`);
+          }
+        }
+        // Apply role filter
+        if (es.role_filter) {
+          users = users.filter(u => u.role === es.role_filter);
+          console.log(`[dispatch]   → after role filter "${es.role_filter}": ${users.length} users`);
+        }
+        clients.push(...users.map(u => ({
+          id: u.id, name: u.full_name || u.email, email: u.email
+        })));
       }
 
       if (clients.length === 0) {
