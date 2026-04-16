@@ -126,13 +126,24 @@ const Groups = () => {
     if (res.ok) setMetabaseConnections(await res.json());
   }, [token]);
 
+  const fetchExternalSources = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/external-users/sources`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setExternalSources(data.sources || []);
+      }
+    } catch {}
+  }, [token]);
+
   useEffect(() => {
     fetchGroups();
     fetchLogs();
     fetchExamplePayload();
     fetchFilterOptions();
     fetchMetabaseConnections();
-  }, [fetchGroups, fetchLogs, fetchExamplePayload, fetchFilterOptions, fetchMetabaseConnections]);
+    fetchExternalSources();
+  }, [fetchGroups, fetchLogs, fetchExamplePayload, fetchFilterOptions, fetchMetabaseConnections, fetchExternalSources]);
 
   const resetForm = () => {
     setFormName("");
@@ -141,6 +152,7 @@ const Groups = () => {
     setFormType("clients");
     setFormFilters([]);
     setFormQueries([]);
+    setFormExtSources([]);
     setEditingGroup(null);
     setCreating(false);
   };
