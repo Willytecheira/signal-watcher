@@ -177,7 +177,7 @@ export default function ExternalUsers() {
                     <TableRow key={u.id} className="border-border">
                       <TableCell className="font-medium flex items-center gap-2">
                         {u.role === "admin" ? (
-                          <Shield className="h-4 w-4 text-yellow-500" />
+                          <Shield className="h-4 w-4 text-accent-foreground" />
                         ) : (
                           <User className="h-4 w-4 text-muted-foreground" />
                         )}
