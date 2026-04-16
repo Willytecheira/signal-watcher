@@ -16,7 +16,7 @@ RUN apk add --no-cache sqlite \
     && chmod +x /usr/local/bin/supercronic
 
 # Copy backend
-COPY backend/package.json backend/server.js backend/db.js backend/auth.js backend/webhooks.js backend/groups.js ./
+COPY backend/package.json backend/server.js backend/db.js backend/auth.js backend/webhooks.js backend/groups.js backend/external-users.js ./
 
 # Copy backup script and crontab
 COPY backend/backup.sh ./backup.sh
