@@ -13,6 +13,7 @@ const { insertSignal, getSignals, getCount, getFilterOptions } = require("./db")
 const { handleAuthRoutes, requireAuth, requireAdmin } = require("./auth");
 const { handleWebhookRoutes, dispatchSignal } = require("./webhooks");
 const { handleGroupRoutes, dispatchNotifications } = require("./groups");
+const { handleExternalUsersRoutes } = require("./external-users");
 // ── Config ──────────────────────────────────────────────────
 const BROKERS = (process.env.KAFKA_BROKERS || "65.108.235.150:9092").split(",");
 const TOPIC = process.env.KAFKA_TOPIC || "bridgewise.alerts.normalized";
@@ -206,6 +207,10 @@ const server = http.createServer(async (req, res) => {
   // Group & notification routes
   const grHandled = await handleGroupRoutes(req, res, json, requireAdmin);
   if (grHandled !== false) return;
+
+  // External users routes
+  const euHandled = await handleExternalUsersRoutes(req, res, json, requireAdmin);
+  if (euHandled !== false) return;
 
   // Filter options (distinct values from signals)
   if (req.url === "/api/signals/filter-options") {
