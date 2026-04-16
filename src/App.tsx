@@ -9,6 +9,7 @@ import Index from "./pages/Index.tsx";
 import Login from "./pages/Login.tsx";
 import Groups from "./pages/Groups.tsx";
 import MetabaseSettings from "./pages/MetabaseSettings.tsx";
+import ExternalUsers from "./pages/ExternalUsers.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const AppInner = () => {
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/groups" element={<ProtectedRoute><Groups /></ProtectedRoute>} />
           <Route path="/settings/metabase" element={<ProtectedRoute><MetabaseSettings /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute><ExternalUsers /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
