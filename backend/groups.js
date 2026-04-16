@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { fetchUsersFromSource: fetchExtUsers, stmts: extStmts } = (() => {
+const { fetchUsersFromSource: fetchExtUsers, stmts: extStmts, getCachedUsers } = (() => {
   try { return require("./external-users"); } catch { return {}; }
 })();
 const { db } = require("./db");
