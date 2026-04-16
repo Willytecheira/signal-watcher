@@ -396,6 +396,50 @@ const Groups = () => {
                 </div>
                 )}
 
+                {/* External User Sources — only for 'external' type */}
+                {formType === "external" && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Fuentes de Usuarios del Sistema</label>
+                    <div className="flex gap-2">
+                      <Link to="/users" className="text-xs text-primary hover:underline self-center">Gestionar fuentes</Link>
+                      <Button variant="outline" size="sm" onClick={() => setFormExtSources([...formExtSources, { source_id: "", role_filter: "" }])} className="h-7 text-xs gap-1"><Plus className="h-3 w-3" /> Fuente</Button>
+                    </div>
+                  </div>
+                  {externalSources.length === 0 && formExtSources.length > 0 && (
+                    <p className="text-xs text-amber-400 mb-2">⚠ No hay fuentes de usuarios configuradas. <Link to="/users" className="text-primary hover:underline">Crear una</Link></p>
+                  )}
+                  {formExtSources.map((es, idx) => (
+                    <div key={idx} className="flex gap-2 items-center mb-2">
+                      <Select value={es.source_id} onValueChange={v => {
+                        const updated = [...formExtSources];
+                        updated[idx] = { ...updated[idx], source_id: v };
+                        setFormExtSources(updated);
+                      }}>
+                        <SelectTrigger className="w-48"><SelectValue placeholder="Fuente..." /></SelectTrigger>
+                        <SelectContent>
+                          {externalSources.map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input value={es.role_filter} onChange={e => {
+                        const updated = [...formExtSources];
+                        updated[idx] = { ...updated[idx], role_filter: e.target.value };
+                        setFormExtSources(updated);
+                      }} placeholder="Filtro por rol (ej: admin, user)" className="flex-1" />
+                      <Button variant="ghost" size="icon" onClick={() => setFormExtSources(formExtSources.filter((_, i) => i !== idx))} className="h-8 w-8 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  ))}
+                  <div className="rounded-lg border border-border/30 bg-muted/20 p-3 mt-2">
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Usuarios del Sistema:</strong> Se obtendrán los usuarios registrados en las fuentes seleccionadas.
+                      Opcionalmente, filtra por rol (admin, user, instructor, etc.) para enviar señales solo a ciertos usuarios.
+                    </p>
+                  </div>
+                </div>
+                )}
+
                 {formType === "broadcast" && (
                   <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
                     <p className="text-xs text-muted-foreground">
