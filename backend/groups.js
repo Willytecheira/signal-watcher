@@ -489,6 +489,14 @@ async function handleGroupRoutes(req, res, json, requireAdmin) {
     return json(res, 200, { ok: true });
   }
 
+  if (url.match(/^\/api\/admin\/groups\/[^/]+\/external-sources$/) && method === "PUT") {
+    const id = url.split("/api/admin/groups/")[1].replace("/external-sources", "");
+    const body = await readBody(req);
+    if (!body || !Array.isArray(body.sources)) return json(res, 400, { error: "Invalid body" });
+    saveGroupExtSources(id, body.sources);
+    return json(res, 200, { ok: true });
+  }
+
   if (url.match(/^\/api\/admin\/groups\/[^/]+$/) && method === "DELETE") {
     const id = url.split("/api/admin/groups/")[1];
     const deleted = removeGroup(id);
