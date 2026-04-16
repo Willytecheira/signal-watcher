@@ -169,4 +169,4 @@ async function handleExternalUsersRoutes(req, res, json, requireAdmin) {
   return false;
 }
 
-module.exports = { handleExternalUsersRoutes };
+module.exports = { handleExternalUsersRoutes, fetchUsersFromSource, stmts };
