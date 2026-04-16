@@ -523,6 +523,22 @@ const Groups = () => {
                           </div>
                         </div>
                       )}
+                      {g.external_sources?.length > 0 && (
+                        <div>
+                          <span className="text-xs text-muted-foreground mb-1 block">Fuentes de Usuarios:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {g.external_sources.map((es: any, i: number) => {
+                              const srcName = externalSources.find(s => s.id === es.source_id)?.name || es.source_id;
+                              return (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  <span className="text-primary mr-1">[{srcName}]</span>
+                                  {es.role_filter ? `rol: ${es.role_filter}` : "todos los roles"}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
