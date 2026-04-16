@@ -283,10 +283,19 @@ function matchesGroupFilters(group, signal) {
 
 async function dispatchNotifications(signal) {
   const groups = listGroups.all().filter(g => g.active);
+  console.log(`[dispatch] Signal ${signal.symbol}/${signal.action} — checking ${groups.length} active group(s)`);
   for (const group of groups) {
     group.filters = getFiltersByGroup.all(group.id);
-    if (!matchesGroupFilters(group, signal)) continue;
-    if (!group.endpoint_url) continue;
+    if (!matchesGroupFilters(group, signal)) {
+      console.log(`[dispatch] Group "${group.name}" (${group.group_type}) — filters don't match, skipping`);
+      continue;
+    }
+    if (!group.endpoint_url) {
+      console.log(`[dispatch] Group "${group.name}" — no endpoint_url, skipping`);
+      continue;
+    }
+
+    console.log(`[dispatch] Group "${group.name}" (${group.group_type}) — filters match, fetching clients…`);
 
     let clients = [];
     if (group.group_type === "broadcast") {
@@ -294,6 +303,7 @@ async function dispatchNotifications(signal) {
     } else {
       // Metabase queries
       const queries = getQueriesByGroup.all(group.id);
+      if (queries.length > 0) console.log(`[dispatch]   → ${queries.length} Metabase queries`);
       for (const q of queries) {
         let rows;
         if (q.connection_id) {
@@ -307,30 +317,39 @@ async function dispatchNotifications(signal) {
       }
 
       // External user sources
-      if (extStmts && extStmts.get) {
-        const extSources = getExtSourcesByGroup.all(group.id);
+      const extSources = getExtSourcesByGroup.all(group.id);
+      console.log(`[dispatch]   → ${extSources.length} external source(s)`);
+      if (fetchExtUsers && extStmts && extStmts.get) {
         for (const es of extSources) {
           const source = extStmts.get.get(es.source_id);
-          if (!source || !source.active) continue;
+          if (!source) { console.log(`[dispatch]   → source ${es.source_id} not found`); continue; }
+          if (!source.active) { console.log(`[dispatch]   → source "${source.name}" inactive`); continue; }
           try {
+            console.log(`[dispatch]   → fetching users from "${source.name}" (auth_token: ${source.auth_token ? 'set' : 'NOT SET'}, role_filter: ${es.role_filter || 'none'})`);
             let users = await fetchExtUsers(source);
+            console.log(`[dispatch]   → got ${users.length} users from "${source.name}"`);
             if (es.role_filter) {
               users = users.filter(u => u.role === es.role_filter);
+              console.log(`[dispatch]   → after role filter "${es.role_filter}": ${users.length} users`);
             }
             clients.push(...users.map(u => ({
               id: u.id, name: u.full_name || u.email, email: u.email
             })));
           } catch (err) {
-            console.error(`External source ${source.name} error:`, err.message);
+            console.error(`[dispatch]   → External source "${source.name}" error:`, err.message);
           }
         }
+      } else {
+        console.log(`[dispatch]   → external users module not available (fetchExtUsers: ${!!fetchExtUsers}, extStmts: ${!!extStmts})`);
       }
 
       if (clients.length === 0) {
+        console.log(`[dispatch]   → no clients found, sending as no_clients`);
         clients = [{ id: null, name: "no_clients" }];
       }
     }
 
+    console.log(`[dispatch] Sending to ${clients.length} client(s) via ${group.endpoint_url}`);
     for (const client of clients) {
       const payload = {
         signal: {
@@ -354,9 +373,11 @@ async function dispatchNotifications(signal) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        console.log(`[dispatch]   → POST to ${group.endpoint_url}: ${resp.status}`);
         insertNotifLog.run(group.id, group.name, signal.id, signal.symbol, payload.client.id, payload.client.name,
           resp.ok ? "success" : "error", resp.status, resp.ok ? null : `HTTP ${resp.status}`);
       } catch (err) {
+        console.error(`[dispatch]   → POST error:`, err.message);
         insertNotifLog.run(group.id, group.name, signal.id, signal.symbol, payload.client.id, payload.client.name,
           "error", null, err.message);
       }
