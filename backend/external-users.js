@@ -135,25 +135,47 @@ function parseBody(req) {
 async function handleExternalUsersRoutes(req, res, json, requireAdmin) {
   const url = req.url.split("?")[0];
 
-  // GET /api/admin/external-users — fetch users from all active sources
+  // GET /api/admin/external-users — fetch users from all active sources & cache them
   if (url === "/api/admin/external-users" && req.method === "GET") {
     if (!requireAdmin(req)) return json(res, 403, { error: "Admin only" });
+    const useCache = req.url.includes("cache=true");
     try {
+      if (useCache) {
+        const users = getCachedUsers();
+        return json(res, 200, { users, fromCache: true });
+      }
       const sources = stmts.list.all().filter((s) => s.active);
       const allUsers = [];
       for (const src of sources) {
         try {
           const users = await fetchUsersFromSource(src, req.headers.authorization);
+          // Cache users in SQLite
+          cacheUsersForSource(src.id, users);
+          console.log(`[cache] Cached ${users.length} users from source "${src.name}"`);
           users.forEach((u) => { u._source = src.name; u._source_id = src.id; });
           allUsers.push(...users);
         } catch (err) {
           console.error(`Source ${src.name} error:`, err.message);
+          // Fallback to cache for this source
+          const cached = getCachedUsers(src.id);
+          if (cached.length > 0) {
+            console.log(`[cache] Using ${cached.length} cached users for source "${src.name}"`);
+            cached.forEach(u => { u._source = src.name + " (cache)"; });
+            allUsers.push(...cached);
+          }
         }
       }
       return json(res, 200, { users: allUsers });
     } catch (err) {
       return json(res, 502, { error: err.message });
     }
+  }
+
+  // GET /api/admin/external-users/cached — get only cached users
+  if (url === "/api/admin/external-users/cached" && req.method === "GET") {
+    if (!requireAdmin(req)) return json(res, 403, { error: "Admin only" });
+    const users = getCachedUsers();
+    return json(res, 200, { users, fromCache: true });
   }
 
   // GET /api/admin/external-users/sources — list sources
