@@ -84,14 +84,16 @@ const Groups = () => {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState<{ symbols: string[]; event_types: string[]; event_names: string[]; actions: string[] }>({ symbols: [], event_types: [], event_names: [], actions: ["BUY", "SELL", "NEUTRAL"] });
   const [metabaseConnections, setMetabaseConnections] = useState<MetabaseConnection[]>([]);
+  const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
 
   // Form state
   const [formName, setFormName] = useState("");
   const [formDesc, setFormDesc] = useState("");
   const [formEndpoint, setFormEndpoint] = useState("");
-  const [formType, setFormType] = useState<"clients" | "broadcast">("clients");
+  const [formType, setFormType] = useState<"clients" | "broadcast" | "external">("clients");
   const [formFilters, setFormFilters] = useState<SignalFilter[]>([]);
   const [formQueries, setFormQueries] = useState<MetabaseQuery[]>([]);
+  const [formExtSources, setFormExtSources] = useState<ExternalSourceRef[]>([]);
 
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
