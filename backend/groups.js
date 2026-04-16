@@ -137,6 +137,13 @@ const insertQuery = db.prepare(
 const deleteQueriesByGroup = db.prepare(`DELETE FROM metabase_queries WHERE group_id = ?`);
 const getQueriesByGroup = db.prepare(`SELECT * FROM metabase_queries WHERE group_id = ?`);
 
+// External sources per group
+const insertGroupExtSource = db.prepare(
+  `INSERT INTO group_external_sources (id, group_id, source_id, role_filter) VALUES (?, ?, ?, ?)`
+);
+const deleteExtSourcesByGroup = db.prepare(`DELETE FROM group_external_sources WHERE group_id = ?`);
+const getExtSourcesByGroup = db.prepare(`SELECT * FROM group_external_sources WHERE group_id = ?`);
+
 const insertNotifLog = db.prepare(
   `INSERT INTO notification_logs (group_id, group_name, signal_id, signal_symbol, client_id, client_name, status, http_status, error_message)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
