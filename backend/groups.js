@@ -91,6 +91,18 @@ db.exec(`
 db.exec(`CREATE INDEX IF NOT EXISTS idx_notification_logs_created ON notification_logs(created_at DESC)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_group_filters_group ON group_signal_filters(group_id)`);
 
+// ── Group ↔ External User Sources ───────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS group_external_sources (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL REFERENCES client_groups(id) ON DELETE CASCADE,
+    source_id TEXT NOT NULL REFERENCES external_user_sources(id) ON DELETE CASCADE,
+    role_filter TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_group_ext_sources_group ON group_external_sources(group_id)`);
+
 // ── Prepared statements ─────────────────────────────────────
 const insertGroup = db.prepare(
   `INSERT INTO client_groups (id, name, description, endpoint_url, group_type, active) VALUES (?, ?, ?, ?, ?, ?)`
