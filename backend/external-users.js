@@ -64,6 +64,44 @@ const stmts = {
   del: db.prepare("DELETE FROM external_user_sources WHERE id = ?"),
 };
 
+// ── Cache stmts ─────────────────────────────────────────────
+const cacheStmts = {
+  upsert: db.prepare(
+    `INSERT OR REPLACE INTO cached_external_users (id, source_id, email, full_name, role, raw_json, cached_at)
+     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+  ),
+  deleteBySource: db.prepare("DELETE FROM cached_external_users WHERE source_id = ?"),
+  getBySource: db.prepare("SELECT * FROM cached_external_users WHERE source_id = ? ORDER BY full_name"),
+  getAll: db.prepare("SELECT * FROM cached_external_users ORDER BY full_name"),
+};
+
+function cacheUsersForSource(sourceId, users) {
+  cacheStmts.deleteBySource.run(sourceId);
+  for (const u of users) {
+    cacheStmts.upsert.run(
+      u.id || crypto.randomUUID(),
+      sourceId,
+      u.email || null,
+      u.full_name || null,
+      u.role || null,
+      JSON.stringify(u)
+    );
+  }
+}
+
+function getCachedUsers(sourceId) {
+  const rows = sourceId ? cacheStmts.getBySource.all(sourceId) : cacheStmts.getAll.all();
+  return rows.map(r => ({
+    id: r.id,
+    email: r.email,
+    full_name: r.full_name,
+    role: r.role,
+    _source_id: r.source_id,
+    _cached_at: r.cached_at,
+    ...(r.raw_json ? JSON.parse(r.raw_json) : {}),
+  }));
+}
+
 // ── Fetch users from a source ───────────────────────────────
 async function fetchUsersFromSource(source, bearerToken) {
   const response = await fetch(source.function_url, {
