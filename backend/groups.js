@@ -1,4 +1,7 @@
 const crypto = require("crypto");
+const { fetchUsersFromSource: fetchExtUsers, stmts: extStmts } = (() => {
+  try { return require("./external-users"); } catch { return {}; }
+})();
 const { db } = require("./db");
 
 // ── Tables ──────────────────────────────────────────────────
