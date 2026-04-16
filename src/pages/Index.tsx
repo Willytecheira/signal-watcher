@@ -6,7 +6,7 @@ import { MetricCards } from "@/components/MetricCards";
 import { SignalTable } from "@/components/SignalTable";
 import { AdminPanel } from "@/components/AdminPanel";
 import { WebhookPanel } from "@/components/WebhookPanel";
-import { Radio, RefreshCw, LogOut, Users, Webhook, UsersRound, Database } from "lucide-react";
+import { Radio, RefreshCw, LogOut, Users, Webhook, UsersRound, Database, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
@@ -63,8 +63,13 @@ const Index = () => {
                   </Button>
                 </Link>
                 <Link to="/settings/metabase">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" title="Metabase">
                     <Database className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link to="/users">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" title="Usuarios externos">
+                    <UserCheck className="h-4 w-4" />
                   </Button>
                 </Link>
               </>
