@@ -34,15 +34,27 @@ interface MetabaseConnection {
   base_url: string;
 }
 
+interface ExternalSourceRef {
+  source_id: string;
+  role_filter: string;
+}
+
+interface ExternalSource {
+  id: string;
+  name: string;
+  function_url: string;
+}
+
 interface ClientGroup {
   id: string;
   name: string;
   description: string | null;
   endpoint_url: string | null;
-  group_type: "clients" | "broadcast";
+  group_type: "clients" | "broadcast" | "external";
   active: boolean;
   filters: SignalFilter[];
   metabase_queries: MetabaseQuery[];
+  external_sources: ExternalSourceRef[];
   created_at: string;
 }
 
@@ -72,14 +84,16 @@ const Groups = () => {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState<{ symbols: string[]; event_types: string[]; event_names: string[]; actions: string[] }>({ symbols: [], event_types: [], event_names: [], actions: ["BUY", "SELL", "NEUTRAL"] });
   const [metabaseConnections, setMetabaseConnections] = useState<MetabaseConnection[]>([]);
+  const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
 
   // Form state
   const [formName, setFormName] = useState("");
   const [formDesc, setFormDesc] = useState("");
   const [formEndpoint, setFormEndpoint] = useState("");
-  const [formType, setFormType] = useState<"clients" | "broadcast">("clients");
+  const [formType, setFormType] = useState<"clients" | "broadcast" | "external">("clients");
   const [formFilters, setFormFilters] = useState<SignalFilter[]>([]);
   const [formQueries, setFormQueries] = useState<MetabaseQuery[]>([]);
+  const [formExtSources, setFormExtSources] = useState<ExternalSourceRef[]>([]);
 
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
@@ -112,13 +126,24 @@ const Groups = () => {
     if (res.ok) setMetabaseConnections(await res.json());
   }, [token]);
 
+  const fetchExternalSources = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/external-users/sources`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setExternalSources(data.sources || []);
+      }
+    } catch {}
+  }, [token]);
+
   useEffect(() => {
     fetchGroups();
     fetchLogs();
     fetchExamplePayload();
     fetchFilterOptions();
     fetchMetabaseConnections();
-  }, [fetchGroups, fetchLogs, fetchExamplePayload, fetchFilterOptions, fetchMetabaseConnections]);
+    fetchExternalSources();
+  }, [fetchGroups, fetchLogs, fetchExamplePayload, fetchFilterOptions, fetchMetabaseConnections, fetchExternalSources]);
 
   const resetForm = () => {
     setFormName("");
@@ -127,6 +152,7 @@ const Groups = () => {
     setFormType("clients");
     setFormFilters([]);
     setFormQueries([]);
+    setFormExtSources([]);
     setEditingGroup(null);
     setCreating(false);
   };
@@ -143,6 +169,7 @@ const Groups = () => {
     setFormType(g.group_type || "clients");
     setFormFilters(g.filters || []);
     setFormQueries(g.metabase_queries?.map(q => ({ connection_id: q.connection_id || "", question_id: q.question_id, label: q.label || "" })) || []);
+    setFormExtSources(g.external_sources?.map(s => ({ source_id: s.source_id, role_filter: s.role_filter || "" })) || []);
     setEditingGroup(g);
     setCreating(false);
   };
@@ -158,24 +185,29 @@ const Groups = () => {
       filters: formFilters,
     };
 
-    if (editingGroup) {
-      const res = await fetch(`${API_URL}/api/admin/groups/${editingGroup.id}`, { method: "PUT", headers, body: JSON.stringify(body) });
-      if (!res.ok) { toast.error("Error al actualizar grupo"); return; }
+    const saveExtras = async (groupId: string) => {
       if (formQueries.length > 0) {
-        await fetch(`${API_URL}/api/admin/groups/${editingGroup.id}/queries`, {
+        await fetch(`${API_URL}/api/admin/groups/${groupId}/queries`, {
           method: "PUT", headers, body: JSON.stringify({ queries: formQueries }),
         });
       }
+      if (formExtSources.length > 0) {
+        await fetch(`${API_URL}/api/admin/groups/${groupId}/external-sources`, {
+          method: "PUT", headers, body: JSON.stringify({ sources: formExtSources }),
+        });
+      }
+    };
+
+    if (editingGroup) {
+      const res = await fetch(`${API_URL}/api/admin/groups/${editingGroup.id}`, { method: "PUT", headers, body: JSON.stringify(body) });
+      if (!res.ok) { toast.error("Error al actualizar grupo"); return; }
+      await saveExtras(editingGroup.id);
       toast.success("Grupo actualizado");
     } else {
       const res = await fetch(`${API_URL}/api/admin/groups`, { method: "POST", headers, body: JSON.stringify(body) });
       if (!res.ok) { toast.error("Error al crear grupo"); return; }
       const created = await res.json();
-      if (formQueries.length > 0) {
-        await fetch(`${API_URL}/api/admin/groups/${created.id}/queries`, {
-          method: "PUT", headers, body: JSON.stringify({ queries: formQueries }),
-        });
-      }
+      await saveExtras(created.id);
       toast.success("Grupo creado");
     }
     resetForm();
@@ -259,10 +291,11 @@ const Groups = () => {
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Tipo de Grupo</label>
-                    <Select value={formType} onValueChange={v => setFormType(v as "clients" | "broadcast")}>
+                    <Select value={formType} onValueChange={v => setFormType(v as "clients" | "broadcast" | "external")}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="clients">Clientes (Metabase)</SelectItem>
+                        <SelectItem value="external">Usuarios del Sistema</SelectItem>
                         <SelectItem value="broadcast">General (Broadcast)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -363,6 +396,50 @@ const Groups = () => {
                 </div>
                 )}
 
+                {/* External User Sources — only for 'external' type */}
+                {formType === "external" && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Fuentes de Usuarios del Sistema</label>
+                    <div className="flex gap-2">
+                      <Link to="/users" className="text-xs text-primary hover:underline self-center">Gestionar fuentes</Link>
+                      <Button variant="outline" size="sm" onClick={() => setFormExtSources([...formExtSources, { source_id: "", role_filter: "" }])} className="h-7 text-xs gap-1"><Plus className="h-3 w-3" /> Fuente</Button>
+                    </div>
+                  </div>
+                  {externalSources.length === 0 && formExtSources.length > 0 && (
+                    <p className="text-xs text-amber-400 mb-2">⚠ No hay fuentes de usuarios configuradas. <Link to="/users" className="text-primary hover:underline">Crear una</Link></p>
+                  )}
+                  {formExtSources.map((es, idx) => (
+                    <div key={idx} className="flex gap-2 items-center mb-2">
+                      <Select value={es.source_id} onValueChange={v => {
+                        const updated = [...formExtSources];
+                        updated[idx] = { ...updated[idx], source_id: v };
+                        setFormExtSources(updated);
+                      }}>
+                        <SelectTrigger className="w-48"><SelectValue placeholder="Fuente..." /></SelectTrigger>
+                        <SelectContent>
+                          {externalSources.map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input value={es.role_filter} onChange={e => {
+                        const updated = [...formExtSources];
+                        updated[idx] = { ...updated[idx], role_filter: e.target.value };
+                        setFormExtSources(updated);
+                      }} placeholder="Filtro por rol (ej: admin, user)" className="flex-1" />
+                      <Button variant="ghost" size="icon" onClick={() => setFormExtSources(formExtSources.filter((_, i) => i !== idx))} className="h-8 w-8 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  ))}
+                  <div className="rounded-lg border border-border/30 bg-muted/20 p-3 mt-2">
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Usuarios del Sistema:</strong> Se obtendrán los usuarios registrados en las fuentes seleccionadas.
+                      Opcionalmente, filtra por rol (admin, user, instructor, etc.) para enviar señales solo a ciertos usuarios.
+                    </p>
+                  </div>
+                </div>
+                )}
+
                 {formType === "broadcast" && (
                   <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
                     <p className="text-xs text-muted-foreground">
@@ -396,10 +473,11 @@ const Groups = () => {
                         <div className="flex items-center gap-2">
                           <span className="text-foreground font-semibold">{g.name}</span>
                           <Badge variant={g.group_type === "broadcast" ? "default" : "outline"} className="text-xs">
-                            {g.group_type === "broadcast" ? "General" : "Clientes"}
+                            {g.group_type === "broadcast" ? "General" : g.group_type === "external" ? "Sistema" : "Clientes"}
                           </Badge>
                           {g.filters.length > 0 && <Badge variant="secondary" className="text-xs">{g.filters.length} filtros</Badge>}
                           {g.metabase_queries?.length > 0 && <Badge variant="outline" className="text-xs">{g.metabase_queries.length} queries</Badge>}
+                          {g.external_sources?.length > 0 && <Badge variant="outline" className="text-xs">{g.external_sources.length} fuentes</Badge>}
                         </div>
                         {g.description && <p className="text-xs text-muted-foreground mt-0.5">{g.description}</p>}
                       </div>
@@ -439,6 +517,22 @@ const Groups = () => {
                                 <Badge key={i} variant="outline" className="text-xs">
                                   {connName && <span className="text-primary mr-1">[{connName}]</span>}
                                   #{q.question_id} {q.label && `— ${q.label}`}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {g.external_sources?.length > 0 && (
+                        <div>
+                          <span className="text-xs text-muted-foreground mb-1 block">Fuentes de Usuarios:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {g.external_sources.map((es: any, i: number) => {
+                              const srcName = externalSources.find(s => s.id === es.source_id)?.name || es.source_id;
+                              return (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  <span className="text-primary mr-1">[{srcName}]</span>
+                                  {es.role_filter ? `rol: ${es.role_filter}` : "todos los roles"}
                                 </Badge>
                               );
                             })}

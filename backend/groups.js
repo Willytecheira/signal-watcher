@@ -1,4 +1,7 @@
 const crypto = require("crypto");
+const { fetchUsersFromSource: fetchExtUsers, stmts: extStmts } = (() => {
+  try { return require("./external-users"); } catch { return {}; }
+})();
 const { db } = require("./db");
 
 // ── Tables ──────────────────────────────────────────────────
@@ -88,6 +91,18 @@ db.exec(`
 db.exec(`CREATE INDEX IF NOT EXISTS idx_notification_logs_created ON notification_logs(created_at DESC)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_group_filters_group ON group_signal_filters(group_id)`);
 
+// ── Group ↔ External User Sources ───────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS group_external_sources (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL REFERENCES client_groups(id) ON DELETE CASCADE,
+    source_id TEXT NOT NULL REFERENCES external_user_sources(id) ON DELETE CASCADE,
+    role_filter TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_group_ext_sources_group ON group_external_sources(group_id)`);
+
 // ── Prepared statements ─────────────────────────────────────
 const insertGroup = db.prepare(
   `INSERT INTO client_groups (id, name, description, endpoint_url, group_type, active) VALUES (?, ?, ?, ?, ?, ?)`
@@ -121,6 +136,13 @@ const insertQuery = db.prepare(
 );
 const deleteQueriesByGroup = db.prepare(`DELETE FROM metabase_queries WHERE group_id = ?`);
 const getQueriesByGroup = db.prepare(`SELECT * FROM metabase_queries WHERE group_id = ?`);
+
+// External sources per group
+const insertGroupExtSource = db.prepare(
+  `INSERT INTO group_external_sources (id, group_id, source_id, role_filter) VALUES (?, ?, ?, ?)`
+);
+const deleteExtSourcesByGroup = db.prepare(`DELETE FROM group_external_sources WHERE group_id = ?`);
+const getExtSourcesByGroup = db.prepare(`SELECT * FROM group_external_sources WHERE group_id = ?`);
 
 const insertNotifLog = db.prepare(
   `INSERT INTO notification_logs (group_id, group_name, signal_id, signal_symbol, client_id, client_name, status, http_status, error_message)
@@ -156,6 +178,7 @@ function editGroup(id, { name, description, endpoint_url, group_type, active, fi
 function removeGroup(id) {
   deleteFiltersByGroup.run(id);
   deleteQueriesByGroup.run(id);
+  deleteExtSourcesByGroup.run(id);
   return deleteGroup.run(id).changes > 0;
 }
 
@@ -164,6 +187,7 @@ function getAllGroups() {
   for (const g of groups) {
     g.filters = getFiltersByGroup.all(g.id);
     g.metabase_queries = getQueriesByGroup.all(g.id);
+    g.external_sources = getExtSourcesByGroup.all(g.id);
   }
   return groups;
 }
@@ -174,7 +198,15 @@ function getGroup(id) {
   g.active = !!g.active;
   g.filters = getFiltersByGroup.all(id);
   g.metabase_queries = getQueriesByGroup.all(id);
+  g.external_sources = getExtSourcesByGroup.all(id);
   return g;
+}
+
+function saveGroupExtSources(groupId, sources) {
+  deleteExtSourcesByGroup.run(groupId);
+  for (const s of sources) {
+    insertGroupExtSource.run(crypto.randomUUID(), groupId, s.source_id, s.role_filter || null);
+  }
 }
 
 // ── Metabase Connections CRUD ───────────────────────────────
@@ -260,6 +292,7 @@ async function dispatchNotifications(signal) {
     if (group.group_type === "broadcast") {
       clients = [{ id: null, name: "broadcast" }];
     } else {
+      // Metabase queries
       const queries = getQueriesByGroup.all(group.id);
       for (const q of queries) {
         let rows;
@@ -272,6 +305,27 @@ async function dispatchNotifications(signal) {
           clients.push(...rows);
         }
       }
+
+      // External user sources
+      if (extStmts && extStmts.get) {
+        const extSources = getExtSourcesByGroup.all(group.id);
+        for (const es of extSources) {
+          const source = extStmts.get.get(es.source_id);
+          if (!source || !source.active) continue;
+          try {
+            let users = await fetchExtUsers(source);
+            if (es.role_filter) {
+              users = users.filter(u => u.role === es.role_filter);
+            }
+            clients.push(...users.map(u => ({
+              id: u.id, name: u.full_name || u.email, email: u.email
+            })));
+          } catch (err) {
+            console.error(`External source ${source.name} error:`, err.message);
+          }
+        }
+      }
+
       if (clients.length === 0) {
         clients = [{ id: null, name: "no_clients" }];
       }
@@ -432,6 +486,14 @@ async function handleGroupRoutes(req, res, json, requireAdmin) {
     const body = await readBody(req);
     if (!body || !Array.isArray(body.queries)) return json(res, 400, { error: "Invalid body" });
     saveGroupQueries(id, body.queries);
+    return json(res, 200, { ok: true });
+  }
+
+  if (url.match(/^\/api\/admin\/groups\/[^/]+\/external-sources$/) && method === "PUT") {
+    const id = url.split("/api/admin/groups/")[1].replace("/external-sources", "");
+    const body = await readBody(req);
+    if (!body || !Array.isArray(body.sources)) return json(res, 400, { error: "Invalid body" });
+    saveGroupExtSources(id, body.sources);
     return json(res, 200, { ok: true });
   }
 
